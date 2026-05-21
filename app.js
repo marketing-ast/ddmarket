@@ -11,14 +11,7 @@ const CART_TTL_MS = 24 * 60 * 60 * 1000;
 const UNIT_KG = "кг";
 const UNIT_PC = "шт";
 
-const FALLBACK_PRODUCTS = [
-    { id: 1, name: "Апельсины", unit: UNIT_KG, category: "Фрукты", availability: "in stock", price: 990, sale: false, emoji: "🍊" },
-    { id: 2, name: "Молоко 1 л", unit: UNIT_PC, category: "Молочные продукты", availability: "in stock", price: 520, sale: true, emoji: "🥛" },
-    { id: 3, name: "Картофель", unit: UNIT_KG, category: "Овощи", availability: "in stock", price: 240, sale: false, emoji: "🥔" },
-    { id: 4, name: "Хлеб пшеничный", unit: UNIT_PC, category: "Бакалея", availability: "in stock", price: 210, sale: false, emoji: "🍞" },
-];
-
-let products = normalizeProducts(FALLBACK_PRODUCTS);
+let products = [];
 let productsById = new Map(products.map((item) => [item.id, item]));
 let cart = {};
 let activeCategory = "all";
@@ -30,7 +23,6 @@ const els = {
     emptyState: $("#empty-state"),
     searchInput: $("#search-input"),
     categoriesBar: $("#categories-bar"),
-    loadingBanner: $("#loading-banner"),
     lastUpdate: $("#last-update"),
     cartItems: $("#cart-items"),
     cartEmpty: $("#cart-empty"),
@@ -158,7 +150,6 @@ function parseCSVLine(line) {
 async function fetchProductsFromSheets() {
     if (refreshInProgress) return false;
     refreshInProgress = true;
-    els.loadingBanner.hidden = false;
 
     try {
         const cachedTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
@@ -195,7 +186,6 @@ async function fetchProductsFromSheets() {
         updateLastUpdateDisplay(null);
         return false;
     } finally {
-        els.loadingBanner.hidden = true;
         refreshInProgress = false;
     }
 }

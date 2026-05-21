@@ -255,34 +255,6 @@ h2 {
     font-weight: 500;
 }
 
-.loading-banner {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    margin: 10px 0;
-    border-radius: var(--radius);
-    background: var(--surface-soft);
-    padding: 9px 12px;
-    color: var(--orange-dark);
-    font-size: 14px;
-    font-weight: 500;
-}
-
-.loading-spinner {
-    width: 15px;
-    height: 15px;
-    border: 2px solid rgba(223, 123, 45, 0.22);
-    border-top-color: var(--orange);
-    border-radius: 50%;
-    animation: spin 800ms linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(1turn);
-    }
-}
-
 .products-list {
     display: grid;
     grid-template-columns: 1fr;
