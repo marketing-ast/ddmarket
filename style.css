@@ -213,9 +213,13 @@ h2 {
 }
 
 .sticky-filter {
+    position: sticky;
+    top: 0;
+    z-index: 60;
     margin: 0 -10px;
     padding: 7px 10px;
-    background: transparent;
+    background: rgba(255, 250, 245, 0.96);
+    backdrop-filter: blur(10px);
 }
 
 .categories-bar {

@@ -14,7 +14,7 @@ const UNIT_PC = "шт";
 let products = [];
 let productsById = new Map(products.map((item) => [item.id, item]));
 let cart = {};
-let activeCategory = "all";
+let activeCategory = null;
 let refreshInProgress = false;
 
 const $ = (selector) => document.querySelector(selector);
@@ -208,13 +208,12 @@ function getCategories() {
 function renderCategories() {
     const hasSale = products.some((item) => item.sale);
     const categories = [
-        { id: "all", label: "Все" },
         ...(hasSale ? [{ id: "sale", label: "Акции" }] : []),
         ...getCategories().map((category) => ({ id: category, label: category })),
     ];
 
     if (!categories.some((category) => category.id === activeCategory)) {
-        activeCategory = "all";
+        activeCategory = categories[0]?.id || null;
     }
 
     els.categoriesBar.innerHTML = categories.map((category) => `
@@ -227,8 +226,7 @@ function renderCategories() {
 function getFilteredProducts() {
     const query = cleanText(els.searchInput.value).toLowerCase();
     return products.filter((item) => {
-        const matchesCategory = activeCategory === "all"
-            || (activeCategory === "sale" ? item.sale : item.category === activeCategory);
+        const matchesCategory = activeCategory === "sale" ? item.sale : item.category === activeCategory;
         const matchesQuery = !query
             || item.name.toLowerCase().includes(query)
             || item.category.toLowerCase().includes(query);
@@ -245,30 +243,16 @@ function renderProducts() {
         return;
     }
 
-    if (activeCategory === "all") {
-        const grouped = groupByCategory(filtered);
-        els.productsList.innerHTML = Object.entries(grouped)
-            .map(([category, items]) => `
-                <section class="category-section" aria-label="${escapeHtml(category)}">
-                    <div class="category-header">
-                        <span class="category-name">${escapeHtml(category)}</span>
-                        <span class="category-count">${items.length}</span>
-                    </div>
-                    ${items.map(renderProductCard).join("")}
-                </section>
-            `).join("");
-        return;
-    }
-
-    els.productsList.innerHTML = filtered.map(renderProductCard).join("");
-}
-
-function groupByCategory(items) {
-    return items.reduce((groups, item) => {
-        if (!groups[item.category]) groups[item.category] = [];
-        groups[item.category].push(item);
-        return groups;
-    }, {});
+    const title = activeCategory === "sale" ? "Акции" : activeCategory;
+    els.productsList.innerHTML = `
+        <section class="category-section" aria-label="${escapeHtml(title)}">
+            <div class="category-header">
+                <span class="category-name">${escapeHtml(title)}</span>
+                <span class="category-count">${filtered.length}</span>
+            </div>
+            ${filtered.map(renderProductCard).join("")}
+        </section>
+    `;
 }
 
 function renderProductCard(product) {
