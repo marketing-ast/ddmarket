@@ -333,7 +333,7 @@ h2 {
 
 .product-card {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) 98px;
+    grid-template-columns: auto minmax(0, 1fr) 106px;
     align-items: center;
     gap: 10px;
     min-height: 72px;
@@ -419,7 +419,7 @@ h2 {
 
 .counter {
     display: grid;
-    grid-template-columns: 28px minmax(34px, 1fr) 28px;
+    grid-template-columns: 28px minmax(42px, 1fr) 28px;
     align-items: center;
     gap: 4px;
 }
@@ -448,10 +448,10 @@ h2 {
     border: 1px solid var(--line);
     border-radius: 999px;
     background: #fff;
-    padding: 5px 2px;
+    padding: 5px 3px;
     text-align: center;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
 
@@ -466,6 +466,21 @@ h2 {
 
 .product-card .counter-unit {
     display: none;
+}
+
+.counter-btn.plus {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.counter-value-wrap {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.counter-btn.minus {
+    grid-column: 3;
+    grid-row: 1;
 }
 
 .cart-header {
@@ -504,20 +519,24 @@ h2 {
 
 .cart-item {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 132px;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .cart-item .counter {
     justify-self: end;
-    width: 150px;
-    grid-template-columns: 32px minmax(56px, 1fr) 32px;
+    width: 132px;
+    grid-template-columns: 30px minmax(52px, 1fr) 30px;
 }
 
 .cart-item .counter-btn {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
+}
+
+.cart-item .counter-value-wrap {
+    font-size: 13px;
 }
 
 .cart-item-name {
