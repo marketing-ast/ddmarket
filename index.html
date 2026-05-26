@@ -4,31 +4,32 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>A-Store - супермаркет с доставкой</title>
-    <meta name="description" content="A-Store: пример каталога супермаркета с весовыми и штучными товарами, корзиной и заказом через WhatsApp.">
-    <meta property="og:title" content="A-Store - супермаркет с доставкой">
-    <meta property="og:description" content="Каталог товаров с актуальными ценами из Google Таблицы и заказом через WhatsApp.">
+    <title>DD Market - каталог продуктов с доставкой</title>
+    <meta name="description" content="DD Market: свежий каталог продуктов с актуальными ценами, корзиной и заказом через WhatsApp.">
+    <meta property="og:title" content="DD Market - каталог продуктов с доставкой">
+    <meta property="og:description" content="Выбирайте товары в каталоге DD Market и отправляйте заказ в WhatsApp.">
     <meta property="og:type" content="website">
-    <meta name="theme-color" content="#df7b2d">
+    <meta name="theme-color" content="#EA5E18">
     <link rel="preconnect" href="https://docs.google.com">
+    <link rel="stylesheet" href="assets/fonts/onest.css">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
     <a class="skip-link" href="#main">Перейти к каталогу</a>
 
-    <header class="store-head" aria-label="A-Store">
-        <div class="store-brand">
-            <span class="brand-mark" aria-hidden="true">A</span>
-            <div class="brand-copy">
-                <p class="brand-kicker">sample</p>
-                <h1>A-Store</h1>
-            </div>
+    <header class="store-head" aria-label="DD Market">
+        <div class="brand-row">
+            <a class="brand-logo-link" href="#main" aria-label="DD Market, перейти к каталогу">
+                <img class="brand-logo" src="logo/DD MARKET RGB.png" width="11812" height="1787" alt="DD Market" fetchpriority="high">
+            </a>
+            <p class="brand-tagline">Свежие продукты рядом</p>
         </div>
+
         <section class="notice-panel" aria-label="Условия магазина">
-            <p>Магазин работает с 9&nbsp;до&nbsp;10.</p>
-            <p>Доставка от 500&nbsp;тг.</p>
-            <p>Третья покупка: 30% скидка в виде кэшбека.</p>
+            <p><strong>9:00-22:00</strong><span>Ежедневно принимаем заказы</span></p>
+            <p><strong>от 500 тг</strong><span>Доставка по району</span></p>
+            <p><strong>30% кешбэк</strong><span>На третью покупку</span></p>
         </section>
     </header>
 
@@ -36,7 +37,8 @@
         <section id="catalog-screen" class="screen active" aria-labelledby="catalog-title">
             <div class="toolbar">
                 <div>
-                    <h2 id="catalog-title">Каталог</h2>
+                    <p class="section-kicker">Каталог DD Market</p>
+                    <h1 id="catalog-title">Выберите продукты</h1>
                     <p id="last-update" class="last-update" aria-live="polite">Обновляем цены…</p>
                 </div>
                 <label class="search-box">
@@ -63,8 +65,8 @@
         <section id="cart-screen" class="screen" aria-labelledby="cart-title">
             <div class="cart-header">
                 <div>
-                    <p class="brand-kicker">Ваш заказ</p>
-                    <h2 id="cart-title">Корзина</h2>
+                    <p class="section-kicker">Ваш заказ</p>
+                    <h1 id="cart-title">Корзина</h1>
                 </div>
                 <button id="clear-cart-btn" class="ghost-btn" type="button">Очистить</button>
             </div>

@@ -2,14 +2,18 @@
 
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT2mxltvHlBrpAfIHJ5g9XEfRxmQckITPgY_muXeiL-pQtdSC5g0tWUkHo0iMB_FVRGz8ntdJ8rbm_E/pub?output=csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "astore_products_v1";
-const CACHE_TIME_KEY = "astore_products_ts_v1";
-const CART_KEY = "astore_cart_v1";
-const ACTIVE_SCREEN_KEY = "astore_active_screen";
+const CACHE_KEY = "ddmarket_products_v1";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v1";
+const CART_KEY = "ddmarket_cart_v1";
+const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CART_TTL_MS = 24 * 60 * 60 * 1000;
 const UNIT_KG = "кг";
 const UNIT_PC = "шт";
+
+const priceFormatter = new Intl.NumberFormat("ru-KZ", {
+    maximumFractionDigits: 0,
+});
 
 let products = [];
 let productsById = new Map(products.map((item) => [item.id, item]));
@@ -45,15 +49,17 @@ function normalizeProducts(rawProducts) {
         .map((item, index) => {
             const id = Number.parseInt(String(item.id ?? index + 1).replace(/[^\d]/g, ""), 10) || index + 1;
             const unitInfo = normalizeUnitInfo(item.unit);
+            const name = cleanText(item.name);
+            const category = cleanText(item.category) || "Другое";
             return {
                 id,
-                name: cleanText(item.name),
+                name,
                 unit: unitInfo.unit,
-                category: cleanText(item.category) || "Другое",
+                category,
                 availability: item.availability,
                 price: parsePrice(item.price),
                 sale: parseSaleValue(item.sale),
-                emoji: cleanText(item.emoji) || getProductEmoji(item.name, item.category),
+                emoji: cleanText(item.emoji) || getProductEmoji(name, category),
                 quantityStep: unitInfo.quantityStep,
             };
         })
@@ -102,11 +108,12 @@ function parseAvailabilityValue(value) {
 
 function parseSaleValue(value) {
     const normalized = cleanText(value).toLowerCase();
-    return ["yes", "true", "1", "sale", "акция", "да"].includes(normalized);
+    return ["yes", "true", "1", "sale", "акция", "акции", "да"].includes(normalized);
 }
 
 function parseCSV(csvText) {
-    const lines = csvText.trim().split(/\r?\n/).filter(Boolean);
+    const normalizedText = csvText.replace(/^\uFEFF/, "");
+    const lines = normalizedText.trim().split(/\r?\n/).filter(Boolean);
     if (lines.length < 2) return [];
 
     const headers = parseCSVLine(lines[0]).map((header) => header.trim().toLowerCase());
@@ -182,7 +189,7 @@ async function fetchProductsFromSheets() {
         updateLastUpdateDisplay(now);
         return true;
     } catch (error) {
-        console.warn("[A-Store] Google Sheet is unavailable, fallback catalog is used.", error);
+        console.warn("[DD Market] Google Sheet is unavailable.", error);
         updateLastUpdateDisplay(null);
         return false;
     } finally {
@@ -192,12 +199,12 @@ async function fetchProductsFromSheets() {
 
 function updateLastUpdateDisplay(timestamp) {
     if (!timestamp) {
-        els.lastUpdate.textContent = "Работаем с резервным каталогом";
+        els.lastUpdate.textContent = "Не удалось обновить цены. Проверьте подключение.";
         return;
     }
 
     const date = new Date(timestamp);
-    const time = date.toLocaleTimeString("ru-KZ", { hour: "2-digit", minute: "2-digit" });
+    const time = new Intl.DateTimeFormat("ru-KZ", { hour: "2-digit", minute: "2-digit" }).format(date);
     els.lastUpdate.textContent = `Цены обновлены в ${time}`;
 }
 
@@ -208,8 +215,8 @@ function getCategories() {
 function renderCategories() {
     const hasSale = products.some((item) => item.sale);
     const categories = [
-        ...(hasSale ? [{ id: "sale", label: "Акции" }] : []),
-        ...getCategories().map((category) => ({ id: category, label: category })),
+        ...(hasSale ? [{ id: "sale", label: "Акции", sale: true }] : []),
+        ...getCategories().map((category) => ({ id: category, label: category, sale: false })),
     ];
 
     if (!categories.some((category) => category.id === activeCategory)) {
@@ -217,7 +224,7 @@ function renderCategories() {
     }
 
     els.categoriesBar.innerHTML = categories.map((category) => `
-        <button class="cat-chip${category.id === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category.id)}">
+        <button class="cat-chip${category.sale ? " sale-chip" : ""}${category.id === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category.id)}">
             ${escapeHtml(category.label)}
         </button>
     `).join("");
@@ -312,7 +319,7 @@ function formatQty(value) {
 }
 
 function formatPrice(value) {
-    return `${Math.round(Number(value || 0)).toLocaleString("ru-KZ")} тг`;
+    return `${priceFormatter.format(Math.round(Number(value || 0)))} тг`;
 }
 
 function getCartItems() {
@@ -359,7 +366,7 @@ function getCartTotal(items) {
 }
 
 function buildOrderText(items) {
-    const lines = ["Заказ на сайте A-Store.", ""];
+    const lines = ["Заказ на сайте DD Market.", ""];
     items.forEach((item) => {
         lines.push(`${item.name} - ${formatQty(item.qty)} ${item.unit}`);
     });
@@ -423,7 +430,7 @@ function setActiveScreen(screenId) {
 function getProductEmoji(name, category) {
     const text = `${name || ""} ${category || ""}`.toLowerCase();
     const dictionary = [
-        ["молок", "🥛"], ["сыр", "🧀"], ["йогур", "🥛"], ["хлеб", "🍞"],
+        ["молок", "🥛"], ["сыр", "🧀"], ["йогурт", "🥛"], ["хлеб", "🍞"],
         ["яблок", "🍎"], ["груш", "🍐"], ["банан", "🍌"], ["апельс", "🍊"],
         ["мандар", "🍊"], ["лимон", "🍋"], ["карто", "🥔"], ["томат", "🍅"],
         ["огур", "🥒"], ["морков", "🥕"], ["капуст", "🥬"], ["мяс", "🥩"],
@@ -475,6 +482,10 @@ function bindEvents() {
     });
 
     els.clearCartBtn.addEventListener("click", () => {
+        const hasItems = Object.keys(cart).length > 0;
+        if (!hasItems) return;
+        const confirmed = window.confirm("Очистить корзину?");
+        if (!confirmed) return;
         cart = {};
         saveCartToStorage();
         updateCartBadge();
