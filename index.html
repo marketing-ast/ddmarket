@@ -26,21 +26,34 @@
             <p class="brand-tagline">Свежие продукты рядом</p>
         </div>
 
-        <section class="notice-panel" aria-label="Условия магазина">
-            <p><strong>9:00-22:00</strong><span>Ежедневно принимаем заказы</span></p>
-            <p><strong>от 500 тг</strong><span>Доставка по району</span></p>
+        <section class="notice-panel" aria-label="Преимущества магазина">
+            <p><strong>Прямые поставки</strong><span>Без посредников в РК</span></p>
+            <p><strong>7-я доставка</strong><span>Бесплатная</span></p>
             <p><strong>30% кешбэк</strong><span>На третью покупку</span></p>
         </section>
+
+        <nav class="desktop-nav" aria-label="Навигация по разделам">
+            <button class="nav-btn active" type="button" data-screen="catalog-screen" aria-label="Открыть каталог">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9.5Z" />
+                </svg>
+                <span>Каталог</span>
+            </button>
+            <button class="nav-btn" type="button" data-screen="cart-screen" aria-label="Открыть корзину">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M7 6h15l-2 8H8L6 3H2" />
+                    <circle cx="9" cy="20" r="1.6" />
+                    <circle cx="18" cy="20" r="1.6" />
+                </svg>
+                <span>Корзина</span>
+            </button>
+        </nav>
     </header>
 
     <main id="main">
-        <section id="catalog-screen" class="screen active" aria-labelledby="catalog-title">
+        <section id="catalog-screen" class="screen active" aria-label="Каталог товаров">
             <div class="toolbar">
-                <div>
-                    <p class="section-kicker">Каталог DD Market</p>
-                    <h1 id="catalog-title">Выберите продукты</h1>
-                    <p id="last-update" class="last-update" aria-live="polite">Обновляем цены…</p>
-                </div>
+                <p id="last-update" class="last-update" aria-live="polite">Обновляем цены…</p>
                 <label class="search-box">
                     <span class="visually-hidden">Поиск товара</span>
                     <svg aria-hidden="true" viewBox="0 0 24 24">

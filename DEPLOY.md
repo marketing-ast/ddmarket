@@ -6,7 +6,7 @@
 2. Обновите ссылку в `app.js`, если таблица изменилась:
 
 ```js
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/.../pub?output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
 ```
 
 3. Сделайте коммит в ветку `main`.

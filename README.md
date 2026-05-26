@@ -16,13 +16,13 @@ DD Market - статический каталог продуктов с корз
 Сайт читает опубликованный CSV:
 
 ```text
-https://docs.google.com/spreadsheets/d/e/2PACX-1vT2mxltvHlBrpAfIHJ5g9XEfRxmQckITPgY_muXeiL-pQtdSC5g0tWUkHo0iMB_FVRGz8ntdJ8rbm_E/pub?output=csv
+https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv
 ```
 
 Ожидаемые колонки:
 
 ```text
-id,name,unit,category,availability,price,sale,emoji
+id,name,unit,category,availability,price,sale,emoji,image
 ```
 
 Правила:
@@ -32,6 +32,7 @@ id,name,unit,category,availability,price,sale,emoji
 - `availability`: `in stock` показывает товар, `out of stock` скрывает.
 - `sale`: `yes`, `акция` или `да` включает акционный бейдж.
 - `emoji`: необязательная иконка товара.
+- `image`: необязательная ссылка на фото товара. Можно вставлять прямую ссылку на изображение или ссылку Google Drive вида `https://drive.google.com/file/d/.../view`.
 
 ## WhatsApp
 

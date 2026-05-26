@@ -1,10 +1,10 @@
 "use strict";
 
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT2mxltvHlBrpAfIHJ5g9XEfRxmQckITPgY_muXeiL-pQtdSC5g0tWUkHo0iMB_FVRGz8ntdJ8rbm_E/pub?output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "ddmarket_products_v1";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v1";
-const CART_KEY = "ddmarket_cart_v1";
+const CACHE_KEY = "ddmarket_products_v2";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v2";
+const CART_KEY = "ddmarket_cart_v2";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CART_TTL_MS = 24 * 60 * 60 * 1000;
@@ -60,6 +60,7 @@ function normalizeProducts(rawProducts) {
                 price: parsePrice(item.price),
                 sale: parseSaleValue(item.sale),
                 emoji: cleanText(item.emoji) || getProductEmoji(name, category),
+                image: normalizeImageUrl(item.image),
                 quantityStep: unitInfo.quantityStep,
             };
         })
@@ -68,6 +69,23 @@ function normalizeProducts(rawProducts) {
 
 function cleanText(value) {
     return String(value ?? "").trim();
+}
+
+function normalizeImageUrl(value) {
+    const raw = cleanText(value);
+    if (!raw) return "";
+
+    const fileMatch = raw.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (fileMatch) {
+        return `https://drive.google.com/thumbnail?id=${fileMatch[1]}&sz=w900`;
+    }
+
+    const openMatch = raw.match(/[?&]id=([^&]+)/);
+    if (raw.includes("drive.google.com") && openMatch) {
+        return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w900`;
+    }
+
+    return raw;
 }
 
 function normalizeUnitInfo(value) {
@@ -265,13 +283,15 @@ function renderProducts() {
 function renderProductCard(product) {
     const qty = cart[product.id] || 0;
     const unitLabel = product.unit === UNIT_KG ? "весовой" : "штучный";
+    const media = product.image
+        ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" width="360" height="360" loading="lazy">`
+        : `<span class="product-emoji" aria-hidden="true">${escapeHtml(product.emoji)}</span>`;
+
     return `
         <article class="product-card${qty > 0 ? " in-cart" : ""}${product.sale ? " sale-card" : ""}" data-id="${product.id}">
-            <div class="product-topline">
-                <div class="product-emoji" aria-hidden="true">${escapeHtml(product.emoji)}</div>
-                <div>
-                    ${product.sale ? "<span class=\"sale-pill\">Акция</span>" : `<span class="unit-pill">${unitLabel}</span>`}
-                </div>
+            <div class="product-media">
+                ${media}
+                ${product.sale ? "<span class=\"sale-pill\">Акция</span>" : `<span class="unit-pill">${unitLabel}</span>`}
             </div>
             <div class="product-info">
                 <h3 class="product-name">${escapeHtml(product.name)}</h3>
