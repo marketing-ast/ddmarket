@@ -1,9 +1,9 @@
 "use strict";
 
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
+const SHEET_CSV_URL = "data/ddmarket-products.csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "ddmarket_products_v2";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v2";
+const CACHE_KEY = "ddmarket_products_v3";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v3";
 const CART_KEY = "ddmarket_cart_v2";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -53,6 +53,7 @@ function normalizeProducts(rawProducts) {
             const category = cleanText(item.category) || "Другое";
             return {
                 id,
+                barcode: cleanText(item.barcode),
                 name,
                 unit: unitInfo.unit,
                 category,
@@ -189,7 +190,8 @@ async function fetchProductsFromSheets() {
     }
 
     try {
-        const response = await fetch(`${SHEET_CSV_URL}&t=${Date.now()}`, { cache: "no-store" });
+        const separator = SHEET_CSV_URL.includes("?") ? "&" : "?";
+        const response = await fetch(`${SHEET_CSV_URL}${separator}t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const csvText = await response.text();
@@ -251,10 +253,12 @@ function renderCategories() {
 function getFilteredProducts() {
     const query = cleanText(els.searchInput.value).toLowerCase();
     return products.filter((item) => {
-        const matchesCategory = activeCategory === "sale" ? item.sale : item.category === activeCategory;
+        const matchesCategory = query ? true : activeCategory === "sale" ? item.sale : item.category === activeCategory;
         const matchesQuery = !query
             || item.name.toLowerCase().includes(query)
-            || item.category.toLowerCase().includes(query);
+            || item.category.toLowerCase().includes(query)
+            || String(item.barcode || "").toLowerCase().includes(query)
+            || String(item.id || "").toLowerCase().includes(query);
         return matchesCategory && matchesQuery;
     });
 }
@@ -283,14 +287,16 @@ function renderProducts() {
 function renderProductCard(product) {
     const qty = cart[product.id] || 0;
     const unitLabel = product.unit === UNIT_KG ? "весовой" : "штучный";
+    const priceMissing = product.price >= 100000;
     const media = product.image
         ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" width="360" height="360" loading="lazy">`
         : `<span class="product-emoji" aria-hidden="true">${escapeHtml(product.emoji)}</span>`;
 
     return `
-        <article class="product-card${qty > 0 ? " in-cart" : ""}${product.sale ? " sale-card" : ""}" data-id="${product.id}">
+        <article class="product-card${qty > 0 ? " in-cart" : ""}${product.sale ? " sale-card" : ""}${priceMissing ? " price-missing-card" : ""}" data-id="${product.id}">
             <div class="product-media">
                 ${media}
+                ${priceMissing ? "<span class=\"missing-price-pill\">Проверить цену</span>" : ""}
                 ${product.sale ? "<span class=\"sale-pill\">Акция</span>" : `<span class="unit-pill">${unitLabel}</span>`}
             </div>
             <div class="product-info">

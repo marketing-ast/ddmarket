@@ -1,22 +1,23 @@
 # DD Market
 
-DD Market - статический каталог продуктов с корзиной и заказом через WhatsApp. Сайт берет товары и цены из опубликованной Google Таблицы, показывает весовые и штучные товары, выделяет акции и формирует готовый текст заказа.
+DD Market - статический каталог продуктов с корзиной и заказом через WhatsApp. Сайт берет товары и цены из CSV-файла в репозитории, показывает весовые и штучные товары, выделяет акции и формирует готовый текст заказа.
 
 ## Что внутри
 
 - `index.html` - разметка каталога, корзины и нижней навигации.
 - `style.css` - mobile-first дизайн DD Market по брендбуку.
-- `app.js` - загрузка CSV из Google Sheets, парсинг товаров, корзина, кеш и WhatsApp.
+- `app.js` - загрузка CSV, парсинг товаров, корзина, кеш и WhatsApp.
+- `data/ddmarket-products.csv` - рабочая таблица товаров для сайта.
 - `assets/fonts/` - локально подключенный фирменный шрифт Onest.
 - `logo/` - логотип DD Market для интерфейса.
 - `.github/workflows/pages.yml` - деплой статического сайта на GitHub Pages.
 
 ## Таблица товаров
 
-Сайт читает опубликованный CSV:
+Сайт читает CSV:
 
 ```text
-https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv
+data/ddmarket-products.csv
 ```
 
 Ожидаемые колонки:

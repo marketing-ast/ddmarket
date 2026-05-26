@@ -2,11 +2,11 @@
 
 ## Быстрый деплой
 
-1. Проверьте, что таблица опубликована как CSV через Google Sheets: `File -> Share -> Publish to web`.
-2. Обновите ссылку в `app.js`, если таблица изменилась:
+1. Обновите CSV-файл `data/ddmarket-products.csv`.
+2. Проверьте, что ссылка в `app.js` указывает на рабочий CSV:
 
 ```js
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
+const SHEET_CSV_URL = "data/ddmarket-products.csv";
 ```
 
 3. Сделайте коммит в ветку `main`.
@@ -39,4 +39,4 @@ Settings -> Pages -> Build and deployment -> Source -> GitHub Actions
 ## Важные правила
 
 - Не храните приватные ключи и пароли в репозитории.
-- Для статического сайта таблица должна быть опубликована как CSV, иначе браузер не сможет читать цены без серверной части.
+- Для статического сайта CSV должен быть доступен браузеру по публичному URL или лежать в репозитории рядом с сайтом.
