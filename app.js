@@ -3,8 +3,8 @@
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "ddmarket_products_v4";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v4";
+const CACHE_KEY = "ddmarket_products_v5";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v5";
 const CART_KEY = "ddmarket_cart_v2";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -53,7 +53,7 @@ function normalizeProducts(rawProducts) {
             const id = Number.parseInt(String(item.id ?? index + 1).replace(/[^\d]/g, ""), 10) || index + 1;
             const unitInfo = normalizeUnitInfo(item.unit);
             const name = cleanText(item.name);
-            const category = cleanText(item.category) || "Другое";
+            const category = getDisplayCategory(cleanText(item.category) || "Другое", name);
             return {
                 id,
                 barcode: cleanText(item.barcode),
@@ -247,9 +247,43 @@ function getCategories() {
     return [...new Set(products.map((item) => item.category))].sort((a, b) => a.localeCompare(b, "ru"));
 }
 
+function getDisplayCategory(category, name) {
+    const text = cleanText(name).toLowerCase();
+
+    if (category === "Фрукты и ягоды") {
+        if (/(виноград|голубик|клубник|малин|черешн)/.test(text)) return "Ягоды";
+        return "Фрукты";
+    }
+
+    if (category === "Напитки") {
+        if (/(вода|turan|voda|bonaqua|asu|сары-агаш|аква)/.test(text)) return "Вода";
+        if (/(cola|pepsi|fanta|sprite|gorilla|dizzy|salam|zigi|газ|лимонад)/.test(text)) return "Газировка и энергетики";
+        if (/(juicy|gracio|fuse|maxi|сок|чай|каркад)/.test(text)) return "Соки и холодный чай";
+    }
+
+    if (category === "Кондитерские изделия") {
+        if (/(шоколад|конф|snick|twix|milk|батончик|albeni)/.test(text)) return "Шоколад и конфеты";
+        if (/(печ|oreo|belvita|ваф|barni|choco|7days|круас)/.test(text)) return "Печенье и вафли";
+    }
+
+    if (category === "Бытовая химия") {
+        if (/(бумаг|салфет|полотен|туалет)/.test(text)) return "Бумага и салфетки";
+        if (/(зуб|шамп|бальзам|гель|splat|colgate|oral|pantene|elseve|wash)/.test(text)) return "Уход за собой";
+        if (/(порош|стир|tide|ariel|мыло|чист|средств)/.test(text)) return "Стирка и дом";
+        return "Прочая химия";
+    }
+
+    if (category === "Бакалея") {
+        if (/(лапша|макарон|круп|рис|греч|овсян|перлов|манк)/.test(text)) return "Крупы и макароны";
+        if (/(масло|мука|майонез|кетчуп|соус|соль|сахар)/.test(text)) return "Соусы, масло и мука";
+    }
+
+    return category;
+}
+
 function getSuperCategory(category) {
-    if (category === "Бытовая химия") return "Химия";
-    if (["Овощи", "Зелень и салаты", "Фрукты и ягоды", "Сухофрукты и орехи"].includes(category)) {
+    if (["Бытовая химия", "Бумага и салфетки", "Уход за собой", "Стирка и дом", "Прочая химия"].includes(category)) return "Химия";
+    if (["Овощи", "Зелень и салаты", "Фрукты", "Ягоды", "Сухофрукты и орехи"].includes(category)) {
         return "Овощи и фрукты";
     }
     return "Продукты";
