@@ -1,42 +1,28 @@
 # Деплой DD Market
 
-## Быстрый деплой
+## Быстрый Деплой
 
-1. Обновите CSV-файл `data/ddmarket-products.csv`.
-2. Проверьте, что ссылка в `app.js` указывает на рабочий CSV:
+1. Обновите Google Таблицу.
+2. Проверьте, что она опубликована как CSV через `File -> Share -> Publish to web`.
+3. Проверьте, что ссылка в `app.js` указывает на опубликованный CSV:
 
 ```js
-const SHEET_CSV_URL = "data/ddmarket-products.csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
 ```
 
-3. Сделайте коммит в ветку `main`.
-4. Запушьте изменения в GitHub:
+4. Сделайте коммит в ветку `main`.
+5. Запушьте изменения в GitHub:
 
 ```bash
 git push origin main
 ```
 
-5. GitHub Actions запустит workflow `Deploy static site to GitHub Pages`.
+6. GitHub Actions запустит workflow `Deploy static site to GitHub Pages`.
 
-## Настройка GitHub Pages
-
-В репозитории GitHub откройте:
-
-```text
-Settings -> Pages -> Build and deployment -> Source -> GitHub Actions
-```
-
-После этого каждый push в `main` будет публиковать сайт автоматически.
-
-## Проверка после деплоя
+## Проверка После Деплоя
 
 - Откройте опубликованный GitHub Pages URL.
-- Убедитесь, что товары загрузились из таблицы.
-- Добавьте весовой товар: количество должно расти на шаг из таблицы.
-- Добавьте штучный товар: количество должно расти на `1 шт`.
-- Перейдите в корзину и проверьте, что кнопка WhatsApp открывает заказ с текстом `Заказ на сайте DD Market.`
-
-## Важные правила
-
-- Не храните приватные ключи и пароли в репозитории.
-- Для статического сайта CSV должен быть доступен браузеру по публичному URL или лежать в репозитории рядом с сайтом.
+- Убедитесь, что товары загрузились из Google Таблицы.
+- Проверьте поиск по названию, `id` и `barcode`.
+- Проверьте, что товары с ценой `100000` отображаются чёрными карточками.
+- Проверьте WhatsApp-заказ из корзины.

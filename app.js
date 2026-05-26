@@ -1,9 +1,10 @@
 "use strict";
 
-const SHEET_CSV_URL = "data/ddmarket-products.csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
+const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "ddmarket_products_v3";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v3";
+const CACHE_KEY = "ddmarket_products_v4";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v4";
 const CART_KEY = "ddmarket_cart_v2";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -18,6 +19,7 @@ const priceFormatter = new Intl.NumberFormat("ru-KZ", {
 let products = [];
 let productsById = new Map(products.map((item) => [item.id, item]));
 let cart = {};
+let activeSuperCategory = null;
 let activeCategory = null;
 let refreshInProgress = false;
 
@@ -26,6 +28,7 @@ const els = {
     productsList: $("#products-list"),
     emptyState: $("#empty-state"),
     searchInput: $("#search-input"),
+    supercategoriesBar: $("#supercategories-bar"),
     categoriesBar: $("#categories-bar"),
     lastUpdate: $("#last-update"),
     cartItems: $("#cart-items"),
@@ -190,15 +193,8 @@ async function fetchProductsFromSheets() {
     }
 
     try {
-        const separator = SHEET_CSV_URL.includes("?") ? "&" : "?";
-        const response = await fetch(`${SHEET_CSV_URL}${separator}t=${Date.now()}`, { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const csvText = await response.text();
-        const parsed = normalizeProducts(parseCSV(csvText));
-        if (parsed.length === 0) throw new Error("Empty catalog");
-
-        setProducts(parsed);
+        const parsedProducts = await loadCatalogFromUrl(SHEET_CSV_URL);
+        setProducts(parsedProducts);
         const now = Date.now();
         try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(products));
@@ -210,11 +206,30 @@ async function fetchProductsFromSheets() {
         return true;
     } catch (error) {
         console.warn("[DD Market] Google Sheet is unavailable.", error);
-        updateLastUpdateDisplay(null);
-        return false;
+        try {
+            const fallbackProducts = await loadCatalogFromUrl(FALLBACK_CSV_URL);
+            setProducts(fallbackProducts);
+            updateLastUpdateDisplay(Date.now());
+            return true;
+        } catch (fallbackError) {
+            console.warn("[DD Market] Fallback catalog is unavailable.", fallbackError);
+            updateLastUpdateDisplay(null);
+            return false;
+        }
     } finally {
         refreshInProgress = false;
     }
+}
+
+async function loadCatalogFromUrl(url) {
+    const separator = url.includes("?") ? "&" : "?";
+    const response = await fetch(`${url}${separator}t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const csvText = await response.text();
+    const parsed = normalizeProducts(parseCSV(csvText));
+    if (parsed.length === 0) throw new Error("Empty catalog");
+    return parsed;
 }
 
 function updateLastUpdateDisplay(timestamp) {
@@ -232,11 +247,39 @@ function getCategories() {
     return [...new Set(products.map((item) => item.category))].sort((a, b) => a.localeCompare(b, "ru"));
 }
 
+function getSuperCategory(category) {
+    if (category === "Бытовая химия") return "Химия";
+    if (["Овощи", "Зелень и салаты", "Фрукты и ягоды", "Сухофрукты и орехи"].includes(category)) {
+        return "Овощи и фрукты";
+    }
+    return "Продукты";
+}
+
+function getSuperCategories() {
+    const preferred = ["Продукты", "Овощи и фрукты", "Химия"];
+    const available = new Set(products.map((item) => getSuperCategory(item.category)));
+    return preferred.filter((category) => available.has(category));
+}
+
 function renderCategories() {
-    const hasSale = products.some((item) => item.sale);
+    const superCategories = getSuperCategories();
+    if (!superCategories.includes(activeSuperCategory)) {
+        activeSuperCategory = superCategories[0] || null;
+    }
+
+    els.supercategoriesBar.innerHTML = superCategories.map((category) => `
+        <button class="super-chip${category === activeSuperCategory ? " active" : ""}" type="button" data-super-category="${escapeHtml(category)}">
+            ${escapeHtml(category)}
+        </button>
+    `).join("");
+
+    const scopedProducts = products.filter((item) => getSuperCategory(item.category) === activeSuperCategory);
+    const hasSale = scopedProducts.some((item) => item.sale);
     const categories = [
         ...(hasSale ? [{ id: "sale", label: "Акции", sale: true }] : []),
-        ...getCategories().map((category) => ({ id: category, label: category, sale: false })),
+        ...[...new Set(scopedProducts.map((item) => item.category))]
+            .sort((a, b) => a.localeCompare(b, "ru"))
+            .map((category) => ({ id: category, label: category, sale: false })),
     ];
 
     if (!categories.some((category) => category.id === activeCategory)) {
@@ -253,13 +296,14 @@ function renderCategories() {
 function getFilteredProducts() {
     const query = cleanText(els.searchInput.value).toLowerCase();
     return products.filter((item) => {
+        const matchesSuperCategory = query ? true : getSuperCategory(item.category) === activeSuperCategory;
         const matchesCategory = query ? true : activeCategory === "sale" ? item.sale : item.category === activeCategory;
         const matchesQuery = !query
             || item.name.toLowerCase().includes(query)
             || item.category.toLowerCase().includes(query)
             || String(item.barcode || "").toLowerCase().includes(query)
             || String(item.id || "").toLowerCase().includes(query);
-        return matchesCategory && matchesQuery;
+        return matchesSuperCategory && matchesCategory && matchesQuery;
     });
 }
 
@@ -476,6 +520,15 @@ function escapeHtml(value) {
 }
 
 function bindEvents() {
+    els.supercategoriesBar.addEventListener("click", (event) => {
+        const button = event.target.closest(".super-chip");
+        if (!button) return;
+        activeSuperCategory = button.dataset.superCategory;
+        activeCategory = null;
+        renderCategories();
+        renderProducts();
+    });
+
     els.categoriesBar.addEventListener("click", (event) => {
         const button = event.target.closest(".cat-chip");
         if (!button) return;

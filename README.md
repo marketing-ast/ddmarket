@@ -1,46 +1,36 @@
 # DD Market
 
-DD Market - статический каталог продуктов с корзиной и заказом через WhatsApp. Сайт берет товары и цены из CSV-файла в репозитории, показывает весовые и штучные товары, выделяет акции и формирует готовый текст заказа.
+DD Market - статический каталог продуктов с корзиной и заказом через WhatsApp. Сайт берет товары и цены из опубликованной Google Таблицы, показывает весовые и штучные товары, выделяет проблемные цены и формирует готовый текст заказа.
 
 ## Что внутри
 
-- `index.html` - разметка каталога, корзины и нижней навигации.
+- `index.html` - разметка каталога, корзины и навигации.
 - `style.css` - mobile-first дизайн DD Market по брендбуку.
-- `app.js` - загрузка CSV, парсинг товаров, корзина, кеш и WhatsApp.
-- `data/ddmarket-products.csv` - рабочая таблица товаров для сайта.
+- `app.js` - загрузка CSV из Google Sheets, фильтры, корзина, кеш и WhatsApp.
+- `data/ddmarket-products.csv` - резервная выгрузка текущего каталога.
+- `scripts/convert-client-catalog.js` - конвертер клиентского Excel в формат каталога.
 - `assets/fonts/` - локально подключенный фирменный шрифт Onest.
 - `logo/` - логотип DD Market для интерфейса.
-- `.github/workflows/pages.yml` - деплой статического сайта на GitHub Pages.
 
-## Таблица товаров
+## Таблица Товаров
 
-Сайт читает CSV:
+Сайт читает опубликованный CSV:
 
 ```text
-data/ddmarket-products.csv
+https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv
 ```
 
 Ожидаемые колонки:
 
 ```text
-id,name,unit,category,availability,price,sale,emoji,image
+id,barcode,name,unit,category,availability,price,sale,emoji,image
 ```
 
 Правила:
 
-- `unit`: `кг` для весовых товаров, `шт` для штучных.
-- Весовые товары добавляются с шагом из таблицы, например `0.1 кг` или `100 г`.
-- `availability`: `in stock` показывает товар, `out of stock` скрывает.
-- `sale`: `yes`, `акция` или `да` включает акционный бейдж.
-- `emoji`: необязательная иконка товара.
-- `image`: необязательная ссылка на фото товара. Можно вставлять прямую ссылку на изображение или ссылку Google Drive вида `https://drive.google.com/file/d/.../view`.
-
-## WhatsApp
-
-Кнопка WhatsApp формирует сообщение с началом:
-
-```text
-Заказ на сайте DD Market.
-```
-
-Номер задается в `app.js` в константе `WHATSAPP_PHONE`.
+- `barcode`: штрихкод товара, участвует в поиске.
+- `unit`: `кг` для весовых товаров, `шт` для упаковок и штучных товаров.
+- `availability`: сейчас всем ставится `in stock`.
+- `price`: если цены нет, ставится `100000`, а карточка на сайте становится чёрной.
+- `sale`: пока всем `no`.
+- `image`: необязательная ссылка на фото товара.

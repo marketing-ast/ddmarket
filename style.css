@@ -254,11 +254,22 @@ h1 {
     -webkit-overflow-scrolling: touch;
 }
 
+.supercategories-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.supercategories-bar::-webkit-scrollbar,
 .categories-bar::-webkit-scrollbar {
     display: none;
 }
 
-.cat-chip {
+.cat-chip,
+.super-chip {
     flex: 0 0 auto;
     min-height: 40px;
     border: 1px solid var(--line);
@@ -272,12 +283,20 @@ h1 {
     transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease;
 }
 
-.cat-chip:hover {
+.super-chip {
+    min-height: 38px;
+    border-color: rgba(65, 135, 52, 0.24);
+    color: var(--green-dark);
+}
+
+.cat-chip:hover,
+.super-chip:hover {
     transform: translateY(-1px);
     border-color: rgba(234, 94, 24, 0.42);
 }
 
-.cat-chip.active {
+.cat-chip.active,
+.super-chip.active {
     border-color: var(--orange);
     background: var(--orange);
     color: var(--white);
