@@ -445,14 +445,17 @@ h1 {
     align-items: center;
 }
 
-.product-emoji {
+.product-placeholder {
     display: grid;
     width: 39px;
     height: 39px;
     place-items: center;
     border-radius: 50%;
     background: var(--surface-green);
-    font-size: 20px;
+    color: var(--green-dark);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
 }
 
 .product-image {
@@ -464,13 +467,15 @@ h1 {
     background: var(--surface-green);
 }
 
-.sale-card .product-emoji {
+.sale-card .product-placeholder {
     background: var(--orange-soft);
+    color: var(--orange);
 }
 
-.price-missing-card .product-emoji,
+.price-missing-card .product-placeholder,
 .price-missing-card .product-image {
     background: #2a2a2a;
+    color: var(--white);
 }
 
 .sale-pill,
@@ -1085,10 +1090,10 @@ h1 {
         border-radius: 0;
     }
 
-    .product-emoji {
+    .product-placeholder {
         width: 74px;
         height: 74px;
-        font-size: 36px;
+        font-size: 16px;
         background: rgba(255, 255, 255, 0.78);
     }
 

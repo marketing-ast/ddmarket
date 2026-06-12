@@ -7,6 +7,11 @@ if (!sourceFile) {
     throw new Error("XLS_FILE is required");
 }
 
+throw new Error(
+    "scripts/convert-client-catalog.js is deprecated. Use the Google Sheets/import bot flow with columns: " +
+    "id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quantity,sale,image,comment."
+);
+
 const workbook = XLSX.readFile(sourceFile, { raw: false });
 const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {
     header: 1,

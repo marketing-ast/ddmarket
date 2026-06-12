@@ -3,14 +3,77 @@
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const WHATSAPP_PHONE = "77785252162";
-const CACHE_KEY = "ddmarket_products_v5";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v5";
-const CART_KEY = "ddmarket_cart_v2";
+const CACHE_KEY = "ddmarket_products_v6";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v6";
+const CART_KEY = "ddmarket_cart_v3";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const CART_TTL_MS = 24 * 60 * 60 * 1000;
 const UNIT_KG = "кг";
 const UNIT_PC = "шт";
+const FALLBACK_CATEGORY0 = "Продукты";
+const FALLBACK_CATEGORY1 = "Другое";
+const CATEGORY0_ORDER = [
+    "ОВОЩИ/ФРУКТЫ",
+    "ГОТОВИМ САМИ",
+    "МЯСО",
+    "МЯСНОЙ ПРОДУКТ",
+    "МОЛОКО/ЯЙЦО",
+    "БАКАЛЕЯ",
+    "ХЛЕБ/КОНДИТЕРКА",
+    "ВОДА/НАПИТКИ",
+    "ХИМИЯ/ПРОМ",
+];
+const CATEGORY1_ORDER = [
+    "ОВОЩИ",
+    "ФРУКТЫ",
+    "ЯГОДЫ",
+    "ЗЕЛЕНЬ",
+    "СУХОФРУКТЫ",
+    "ТАНДЫР",
+    "ГРИЛЬ",
+    "ВЫПЕЧКА",
+    "ПРОЧЕЕ",
+    "ГОВЯДИНА",
+    "КОНИНА",
+    "БАРАНИНА",
+    "DD BOX",
+    "КОЛБАСА",
+    "КУРИЦА",
+    "РЫБА",
+    "МОЛОКО/КЕФИР",
+    "СМЕТАНА/СЫР",
+    "ТВОРОГ/ЙОГУРТ",
+    "МАСЛО/МАРГАРИН",
+    "МАЙОНЕЗ/КЕТЧУП",
+    "ЯЙЦО",
+    "КРУПЫ/ХЛОПЬЯ",
+    "МАКАРОНЫ/ЛАПША",
+    "МУКА/МАСЛО",
+    "СНЕКИ",
+    "ЧАЙ/КОФЕ/МЕД",
+    "КОНСЕРВЫ/ВАРЕНЬЕ",
+    "ДЕТСКОЕ ПИТАНИЕ",
+    "ПП ПРОДУКТ",
+    "СПЕЦИИ",
+    "ПРОЧАЯ БАКАЛЕЯ",
+    "ХЛЕБ",
+    "ПЕЧЕНЬЕ",
+    "СУШКИ",
+    "ТОРТЫ",
+    "КОНФЕТЫ",
+    "ШОКОЛАД",
+    "ГАЗИРОВКА",
+    "ХОЛОДНЫЙ ЧАЙ",
+    "СОКИ",
+    "МИН.ВОДА",
+    "ЭНЕРГЕТИКИ",
+    "УХОД ЗА СОБОЙ",
+    "УХОД ЗА ОДЕЖДОЙ",
+    "САЛФЕТКИ/БУМАГА",
+    "ПРОЧАЯ ХИМИЯ",
+    "ПРОМ ТОВАРЫ",
+];
 
 const priceFormatter = new Intl.NumberFormat("ru-KZ", {
     maximumFractionDigits: 0,
@@ -50,29 +113,44 @@ function setProducts(nextProducts) {
 function normalizeProducts(rawProducts) {
     return rawProducts
         .map((item, index) => {
-            const id = Number.parseInt(String(item.id ?? index + 1).replace(/[^\d]/g, ""), 10) || index + 1;
+            const id = normalizeProductId(item.id, index);
             const unitInfo = normalizeUnitInfo(item.unit);
             const name = cleanText(item.name);
-            const category = getDisplayCategory(cleanText(item.category) || "Другое", name);
+            const barcode = cleanText(item.barcode);
+            const category1 = cleanText(item.category1) || cleanText(item.category) || FALLBACK_CATEGORY1;
+            const category0 = cleanText(item.category0) || getCategory0FromLegacyCategory(category1);
             return {
                 id,
-                barcode: cleanText(item.barcode),
+                publish: parsePublishValue(item.publish),
+                barcode,
                 name,
+                name1s: cleanText(item.name1s),
                 unit: unitInfo.unit,
-                category,
+                category0,
+                category1,
                 availability: item.availability,
                 price: parsePrice(item.price),
                 sale: parseSaleValue(item.sale),
-                emoji: cleanText(item.emoji) || getProductEmoji(name, category),
                 image: normalizeImageUrl(item.image),
                 quantityStep: unitInfo.quantityStep,
             };
         })
-        .filter((item) => item.name && item.price > 0 && parseAvailabilityValue(item.availability));
+        .filter((item) => (
+            item.publish
+            && item.barcode
+            && item.name
+            && item.price > 0
+            && parseAvailabilityValue(item.availability)
+        ));
 }
 
 function cleanText(value) {
     return String(value ?? "").trim();
+}
+
+function normalizeProductId(value, index) {
+    const raw = cleanText(value).replace(/^'/, "");
+    return raw || String(index + 1);
 }
 
 function normalizeImageUrl(value) {
@@ -126,6 +204,11 @@ function parseAvailabilityValue(value) {
     const normalized = cleanText(value).toLowerCase();
     if (!normalized) return true;
     return !["out of stock", "unavailable", "нет", "no", "false", "0"].some((marker) => normalized.includes(marker));
+}
+
+function parsePublishValue(value) {
+    const normalized = cleanText(value).toLowerCase();
+    return !["no", "false", "0", "нет", "не публиковать"].includes(normalized);
 }
 
 function parseSaleValue(value) {
@@ -243,56 +326,39 @@ function updateLastUpdateDisplay(timestamp) {
     els.lastUpdate.textContent = `Цены обновлены в ${time}`;
 }
 
-function getCategories() {
-    return [...new Set(products.map((item) => item.category))].sort((a, b) => a.localeCompare(b, "ru"));
-}
-
-function getDisplayCategory(category, name) {
-    const text = cleanText(name).toLowerCase();
-
-    if (category === "Фрукты и ягоды") {
-        if (/(виноград|голубик|клубник|малин|черешн)/.test(text)) return "Ягоды";
-        return "Фрукты";
+function getCategory0FromLegacyCategory(category1) {
+    if (["Овощи", "Зелень и салаты", "Фрукты", "Ягоды", "Сухофрукты и орехи"].includes(category1)) {
+        return "ОВОЩИ/ФРУКТЫ";
     }
-
-    if (category === "Напитки") {
-        if (/(вода|turan|voda|bonaqua|asu|сары-агаш|аква)/.test(text)) return "Вода";
-        if (/(cola|pepsi|fanta|sprite|gorilla|dizzy|salam|zigi|газ|лимонад)/.test(text)) return "Газировка и энергетики";
-        if (/(juicy|gracio|fuse|maxi|сок|чай|каркад)/.test(text)) return "Соки и холодный чай";
+    if (["Бытовая химия", "Бумага и салфетки", "Уход за собой", "Стирка и дом", "Прочая химия"].includes(category1)) {
+        return "ХИМИЯ/ПРОМ";
     }
-
-    if (category === "Кондитерские изделия") {
-        if (/(шоколад|конф|snick|twix|milk|батончик|albeni)/.test(text)) return "Шоколад и конфеты";
-        if (/(печ|oreo|belvita|ваф|barni|choco|7days|круас)/.test(text)) return "Печенье и вафли";
-    }
-
-    if (category === "Бытовая химия") {
-        if (/(бумаг|салфет|полотен|туалет)/.test(text)) return "Бумага и салфетки";
-        if (/(зуб|шамп|бальзам|гель|splat|colgate|oral|pantene|elseve|wash)/.test(text)) return "Уход за собой";
-        if (/(порош|стир|tide|ariel|мыло|чист|средств)/.test(text)) return "Стирка и дом";
-        return "Прочая химия";
-    }
-
-    if (category === "Бакалея") {
-        if (/(лапша|макарон|круп|рис|греч|овсян|перлов|манк)/.test(text)) return "Крупы и макароны";
-        if (/(масло|мука|майонез|кетчуп|соус|соль|сахар)/.test(text)) return "Соусы, масло и мука";
-    }
-
-    return category;
-}
-
-function getSuperCategory(category) {
-    if (["Бытовая химия", "Бумага и салфетки", "Уход за собой", "Стирка и дом", "Прочая химия"].includes(category)) return "Химия";
-    if (["Овощи", "Зелень и салаты", "Фрукты", "Ягоды", "Сухофрукты и орехи"].includes(category)) {
-        return "Овощи и фрукты";
-    }
-    return "Продукты";
+    return FALLBACK_CATEGORY0;
 }
 
 function getSuperCategories() {
-    const preferred = ["Продукты", "Овощи и фрукты", "Химия"];
-    const available = new Set(products.map((item) => getSuperCategory(item.category)));
-    return preferred.filter((category) => available.has(category));
+    const available = new Set(products.map((item) => item.category0));
+    const ordered = CATEGORY0_ORDER.filter((category0) => available.has(category0));
+    const extra = [...available]
+        .filter((category0) => !CATEGORY0_ORDER.includes(category0))
+        .sort((a, b) => a.localeCompare(b, "ru"));
+    return [...ordered, ...extra];
+}
+
+function getCategory1SortIndex(category1) {
+    const index = CATEGORY1_ORDER.indexOf(category1);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function getCategoriesForSuperCategory(category0) {
+    return [...new Set(
+        products
+            .filter((item) => item.category0 === category0)
+            .map((item) => item.category1)
+    )].sort((a, b) => {
+        const byOrder = getCategory1SortIndex(a) - getCategory1SortIndex(b);
+        return byOrder || a.localeCompare(b, "ru");
+    });
 }
 
 function renderCategories() {
@@ -307,13 +373,12 @@ function renderCategories() {
         </button>
     `).join("");
 
-    const scopedProducts = products.filter((item) => getSuperCategory(item.category) === activeSuperCategory);
+    const scopedProducts = products.filter((item) => item.category0 === activeSuperCategory);
     const hasSale = scopedProducts.some((item) => item.sale);
     const categories = [
         ...(hasSale ? [{ id: "sale", label: "Акции", sale: true }] : []),
-        ...[...new Set(scopedProducts.map((item) => item.category))]
-            .sort((a, b) => a.localeCompare(b, "ru"))
-            .map((category) => ({ id: category, label: category, sale: false })),
+        ...getCategoriesForSuperCategory(activeSuperCategory)
+            .map((category1) => ({ id: category1, label: category1, sale: false })),
     ];
 
     if (!categories.some((category) => category.id === activeCategory)) {
@@ -330,11 +395,13 @@ function renderCategories() {
 function getFilteredProducts() {
     const query = cleanText(els.searchInput.value).toLowerCase();
     return products.filter((item) => {
-        const matchesSuperCategory = query ? true : getSuperCategory(item.category) === activeSuperCategory;
-        const matchesCategory = query ? true : activeCategory === "sale" ? item.sale : item.category === activeCategory;
+        const matchesSuperCategory = query ? true : item.category0 === activeSuperCategory;
+        const matchesCategory = query ? true : activeCategory === "sale" ? item.sale : item.category1 === activeCategory;
         const matchesQuery = !query
             || item.name.toLowerCase().includes(query)
-            || item.category.toLowerCase().includes(query)
+            || item.name1s.toLowerCase().includes(query)
+            || item.category0.toLowerCase().includes(query)
+            || item.category1.toLowerCase().includes(query)
             || String(item.barcode || "").toLowerCase().includes(query)
             || String(item.id || "").toLowerCase().includes(query);
         return matchesSuperCategory && matchesCategory && matchesQuery;
@@ -350,7 +417,8 @@ function renderProducts() {
         return;
     }
 
-    const title = activeCategory === "sale" ? "Акции" : activeCategory;
+    const query = cleanText(els.searchInput.value);
+    const title = query ? "Результаты поиска" : activeCategory === "sale" ? "Акции" : activeCategory;
     els.productsList.innerHTML = `
         <section class="category-section" aria-label="${escapeHtml(title)}">
             <div class="category-header">
@@ -368,7 +436,7 @@ function renderProductCard(product) {
     const priceMissing = product.price >= 100000;
     const media = product.image
         ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" width="360" height="360" loading="lazy">`
-        : `<span class="product-emoji" aria-hidden="true">${escapeHtml(product.emoji)}</span>`;
+        : "<span class=\"product-placeholder\" aria-hidden=\"true\">DD</span>";
 
     return `
         <article class="product-card${qty > 0 ? " in-cart" : ""}${product.sale ? " sale-card" : ""}${priceMissing ? " price-missing-card" : ""}" data-id="${product.id}">
@@ -394,7 +462,7 @@ function renderProductCard(product) {
 }
 
 function changeCartItemQuantity(id, action) {
-    const product = productsById.get(Number(id));
+    const product = productsById.get(String(id));
     if (!product) return 0;
 
     const current = Number(cart[id] || 0);
@@ -429,7 +497,7 @@ function formatPrice(value) {
 function getCartItems() {
     return Object.entries(cart)
         .map(([id, qty]) => {
-            const product = productsById.get(Number(id));
+            const product = productsById.get(String(id));
             return product ? { ...product, qty: Number(qty) } : null;
         })
         .filter(Boolean);
@@ -444,7 +512,7 @@ function renderCart() {
     els.cartItems.innerHTML = items.map((item) => `
         <div class="cart-item">
             <div>
-                <span class="cart-item-name">${escapeHtml(item.emoji)} ${escapeHtml(item.name)}</span>
+                <span class="cart-item-name">${escapeHtml(item.name)}</span>
                 <span class="cart-item-price">${formatPrice(item.price * item.qty)}</span>
             </div>
             <div class="counter">
@@ -529,19 +597,6 @@ function setActiveScreen(screenId) {
     } catch {
         // Active screen persistence is optional.
     }
-}
-
-function getProductEmoji(name, category) {
-    const text = `${name || ""} ${category || ""}`.toLowerCase();
-    const dictionary = [
-        ["молок", "🥛"], ["сыр", "🧀"], ["йогурт", "🥛"], ["хлеб", "🍞"],
-        ["яблок", "🍎"], ["груш", "🍐"], ["банан", "🍌"], ["апельс", "🍊"],
-        ["мандар", "🍊"], ["лимон", "🍋"], ["карто", "🥔"], ["томат", "🍅"],
-        ["огур", "🥒"], ["морков", "🥕"], ["капуст", "🥬"], ["мяс", "🥩"],
-        ["кур", "🍗"], ["рыб", "🐟"], ["конф", "🍬"], ["печен", "🍪"],
-    ];
-    const found = dictionary.find(([key]) => text.includes(key));
-    return found ? found[1] : "🛒";
 }
 
 function escapeHtml(value) {
