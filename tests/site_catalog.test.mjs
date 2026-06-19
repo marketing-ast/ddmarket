@@ -123,19 +123,27 @@ test("renders product photos as lightbox buttons", () => {
 test("uses local barcode photo fallback when sheet image is empty", () => {
     const { context } = loadApp();
 
-    const html = context.renderProductCard({
+    const product = {
         id: "010001",
         barcode: "2000000177625",
         name: "DD product",
         unit: "шт",
+        category0: "ОВОЩИ/ФРУКТЫ",
+        category1: "ОВОЩИ",
         price: 899,
         image: "",
-    });
+    };
+    const html = context.renderProductCard(product);
+    const expectedJpg = context.localProductImageUrl(product, "jpg");
+    const expectedWebp = context.localProductImageUrl(product, "webp");
+    const expectedPng = context.localProductImageUrl(product, "png");
+    const expectedJpeg = context.localProductImageUrl(product, "jpeg");
 
     assert.match(html, /class="product-image-btn"/);
-    assert.match(html, /data-image="products\/2000000177625\.jpg"/);
-    assert.match(html, /data-fallbacks="products\/2000000177625\.webp\|products\/2000000177625\.png\|products\/2000000177625\.jpeg"/);
-    assert.match(html, /src="products\/2000000177625\.jpg"/);
+    assert.equal(expectedJpg, "products/%D0%9E%D0%92%D0%9E%D0%A9%D0%98-%D0%A4%D0%A0%D0%A3%D0%9A%D0%A2%D0%AB/%D0%9E%D0%92%D0%9E%D0%A9%D0%98/2000000177625.jpg");
+    assert.ok(html.includes(`data-image="${expectedJpg}"`));
+    assert.ok(html.includes(`data-fallbacks="${expectedWebp}|${expectedPng}|${expectedJpeg}"`));
+    assert.ok(html.includes(`src="${expectedJpg}"`));
 });
 
 test("product thumbnails fit inside media frame without cropping", () => {
