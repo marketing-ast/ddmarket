@@ -4,16 +4,29 @@ import test from "node:test";
 import vm from "node:vm";
 
 function createElement() {
+    const classes = new Set();
+    const attributes = new Map();
     return {
         addEventListener() {},
         classList: {
-            contains() { return false; },
-            toggle() {},
+            add: (...values) => values.forEach((value) => classes.add(value)),
+            contains: (value) => classes.has(value),
+            remove: (...values) => values.forEach((value) => classes.delete(value)),
+            toggle(value, force) {
+                const shouldAdd = force ?? !classes.has(value);
+                if (shouldAdd) classes.add(value);
+                else classes.delete(value);
+                return shouldAdd;
+            },
         },
         dataset: {},
+        getAttribute: (name) => attributes.get(name) ?? null,
         hidden: false,
         href: "",
         innerHTML: "",
+        removeAttribute: (name) => attributes.delete(name),
+        setAttribute: (name, value) => attributes.set(name, String(value)),
+        src: "",
         textContent: "",
         value: "",
     };
@@ -27,6 +40,8 @@ function loadApp() {
     };
 
     const document = {
+        addEventListener() {},
+        body: createElement(),
         querySelector: getElement,
         querySelectorAll: () => [],
     };
@@ -89,6 +104,68 @@ test("normalizes only published products with barcode, price, and stock", () => 
     assert.equal(products[0].emoji, undefined);
 });
 
+test("renders product photos as lightbox buttons", () => {
+    const { context } = loadApp();
+
+    const html = context.renderProductCard({
+        id: "010001",
+        name: "DD РњРѕР»РѕРєРѕ",
+        unit: "С€С‚",
+        price: 899,
+        image: "https://cdn.example.com/products/010001.webp",
+    });
+
+    assert.match(html, /class="product-image-btn"/);
+    assert.match(html, /data-image="https:\/\/cdn\.example\.com\/products\/010001\.webp"/);
+    assert.match(html, /class="product-image"/);
+});
+
+test("uses local barcode photo fallback when sheet image is empty", () => {
+    const { context } = loadApp();
+
+    const html = context.renderProductCard({
+        id: "010001",
+        barcode: "2000000177625",
+        name: "DD product",
+        unit: "шт",
+        price: 899,
+        image: "",
+    });
+
+    assert.match(html, /class="product-image-btn"/);
+    assert.match(html, /data-image="products\/2000000177625\.jpg"/);
+    assert.match(html, /data-fallbacks="products\/2000000177625\.webp\|products\/2000000177625\.png\|products\/2000000177625\.jpeg"/);
+    assert.match(html, /src="products\/2000000177625\.jpg"/);
+});
+
+test("product thumbnails fit inside media frame without cropping", () => {
+    const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+    const productImageRule = css.match(/\.product-image\s*\{[^}]+\}/)?.[0] ?? "";
+
+    assert.match(productImageRule, /object-fit:\s*contain;/);
+});
+
+test("opens and closes the photo lightbox", () => {
+    const { context, elements } = loadApp();
+    const lightbox = elements.get("#photo-lightbox");
+    const image = elements.get("#photo-lightbox-image");
+
+    context.openPhotoLightbox("https://cdn.example.com/products/010001.webp", "DD РњРѕР»РѕРєРѕ");
+
+    assert.equal(lightbox.hidden, false);
+    assert.equal(lightbox.getAttribute("aria-hidden"), "false");
+    assert.equal(image.src, "https://cdn.example.com/products/010001.webp");
+    assert.equal(image.alt, "DD РњРѕР»РѕРєРѕ");
+    assert.equal(context.document.body.classList.contains("lightbox-open"), true);
+
+    context.closePhotoLightbox();
+
+    assert.equal(lightbox.hidden, true);
+    assert.equal(lightbox.getAttribute("aria-hidden"), "true");
+    assert.equal(image.src, "");
+    assert.equal(context.document.body.classList.contains("lightbox-open"), false);
+});
+
 test("renders category0 as top navigation and category1 as subnavigation", () => {
     const { context, elements } = loadApp();
 
@@ -123,4 +200,36 @@ test("search matches barcode, category0, and category1 without category filters"
 
     assert.equal(found.length, 1);
     assert.equal(found[0].id, "240001");
+});
+
+test("normalizes promo rows by slot and keeps title or subtitle only rows", () => {
+    const { context } = loadApp();
+
+    const promos = context.normalizePromos([
+        { slot: "3", title: "30% кешбэк", subtitle: "" },
+        { slot: "1", title: "Прямые поставки", subtitle: "Без посредников в РК" },
+        { slot: "2", title: "", subtitle: "Бесплатная" },
+        { slot: "4", title: "", subtitle: "" },
+    ]);
+
+    assert.equal(JSON.stringify(promos), JSON.stringify([
+        { slot: 1, title: "Прямые поставки", subtitle: "Без посредников в РК" },
+        { slot: 2, title: "", subtitle: "Бесплатная" },
+        { slot: 3, title: "30% кешбэк", subtitle: "" },
+    ]));
+});
+
+test("renders notice promos with only present title and subtitle values", () => {
+    const { context, elements } = loadApp();
+
+    context.renderNoticePromos([
+        { slot: 1, title: "Прямые поставки", subtitle: "Без посредников в РК" },
+        { slot: 2, title: "", subtitle: "Бесплатная" },
+        { slot: 3, title: "30% кешбэк", subtitle: "" },
+    ]);
+
+    const html = elements.get("#notice-panel").innerHTML;
+    assert.match(html, /<strong>Прямые поставки<\/strong><span>Без посредников в РК<\/span>/);
+    assert.match(html, /<p><span>Бесплатная<\/span><\/p>/);
+    assert.match(html, /<p><strong>30% кешбэк<\/strong><\/p>/);
 });

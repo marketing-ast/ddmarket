@@ -1,4 +1,11 @@
+temp/
+buffer/
+.local/
+logo/
 old/
 .DS_Store
 Thumbs.db
 *.log
+__pycache__/
+.env
+.env.*

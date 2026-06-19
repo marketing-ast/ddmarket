@@ -1,6 +1,7 @@
 "use strict";
 
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
+const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const WHATSAPP_PHONE = "77785252162";
 const CACHE_KEY = "ddmarket_products_v6";
@@ -89,6 +90,7 @@ let refreshInProgress = false;
 const $ = (selector) => document.querySelector(selector);
 const els = {
     productsList: $("#products-list"),
+    noticePanel: $("#notice-panel"),
     emptyState: $("#empty-state"),
     searchInput: $("#search-input"),
     supercategoriesBar: $("#supercategories-bar"),
@@ -103,6 +105,9 @@ const els = {
     whatsappBtn: $("#whatsapp-btn"),
     copyCartBtn: $("#copy-cart-btn"),
     clearCartBtn: $("#clear-cart-btn"),
+    photoLightbox: $("#photo-lightbox"),
+    photoLightboxImage: $("#photo-lightbox-image"),
+    photoLightboxClose: $("#photo-lightbox-close"),
 };
 
 function setProducts(nextProducts) {
@@ -168,6 +173,25 @@ function normalizeImageUrl(value) {
     }
 
     return raw;
+}
+
+function localProductImageUrl(product, extension = "jpg") {
+    const barcode = cleanText(product?.barcode).replace(/[^\dA-Za-z_-]/g, "");
+    if (!barcode) return "";
+    return `products/${barcode}.${extension}`;
+}
+
+function productImageCandidates(product) {
+    const explicitImage = cleanText(product?.image);
+    if (explicitImage) return [explicitImage];
+    const primary = localProductImageUrl(product, "jpg");
+    if (!primary) return [];
+    return [
+        primary,
+        localProductImageUrl(product, "webp"),
+        localProductImageUrl(product, "png"),
+        localProductImageUrl(product, "jpeg"),
+    ];
 }
 
 function normalizeUnitInfo(value) {
@@ -257,6 +281,54 @@ function parseCSVLine(line) {
 
     result.push(current);
     return result;
+}
+
+function normalizePromos(rawPromos) {
+    return rawPromos
+        .map((item, index) => {
+            const slot = Number.parseInt(cleanText(item.slot), 10);
+            return {
+                slot: Number.isFinite(slot) ? slot : index + 1,
+                title: cleanText(item.title),
+                subtitle: cleanText(item.subtitle),
+            };
+        })
+        .filter((item) => item.title || item.subtitle)
+        .sort((a, b) => a.slot - b.slot)
+        .slice(0, 3);
+}
+
+function renderNoticePromos(promos) {
+    const normalizedPromos = normalizePromos(promos);
+    if (normalizedPromos.length === 0) return false;
+
+    els.noticePanel.innerHTML = normalizedPromos.map((promo) => {
+        const title = promo.title ? `<strong>${escapeHtml(promo.title)}</strong>` : "";
+        const subtitle = promo.subtitle ? `<span>${escapeHtml(promo.subtitle)}</span>` : "";
+        return `<p>${title}${subtitle}</p>`;
+    }).join("");
+    return true;
+}
+
+async function fetchPromosFromSheets() {
+    try {
+        const parsedPromos = await loadPromosFromUrl(SITE_PROMOS_CSV_URL);
+        return renderNoticePromos(parsedPromos);
+    } catch (error) {
+        console.warn("[DD Market] Promo sheet is unavailable.", error);
+        return false;
+    }
+}
+
+async function loadPromosFromUrl(url) {
+    const separator = url.includes("?") ? "&" : "?";
+    const response = await fetch(`${url}${separator}t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const csvText = await response.text();
+    const parsed = normalizePromos(parseCSV(csvText));
+    if (parsed.length === 0) throw new Error("Empty promos");
+    return parsed;
 }
 
 async function fetchProductsFromSheets() {
@@ -434,8 +506,11 @@ function renderProductCard(product) {
     const qty = cart[product.id] || 0;
     const unitLabel = product.unit === UNIT_KG ? "весовой" : "штучный";
     const priceMissing = product.price >= 100000;
-    const media = product.image
-        ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" width="360" height="360" loading="lazy">`
+    const imageCandidates = productImageCandidates(product);
+    const image = imageCandidates[0] || "";
+    const fallbackImages = imageCandidates.slice(1).join("|");
+    const media = image
+        ? `<button class="product-image-btn" type="button" data-image="${escapeHtml(image)}" data-fallbacks="${escapeHtml(fallbackImages)}" data-name="${escapeHtml(product.name)}" aria-label="Открыть фото ${escapeHtml(product.name)}"><img class="product-image" src="${escapeHtml(image)}" data-fallbacks="${escapeHtml(fallbackImages)}" alt="${escapeHtml(product.name)}" width="360" height="360" loading="lazy"></button>`
         : "<span class=\"product-placeholder\" aria-hidden=\"true\">DD</span>";
 
     return `
@@ -548,6 +623,23 @@ function buildOrderText(items) {
     return lines.join("\n");
 }
 
+function openPhotoLightbox(imageUrl, name) {
+    if (!imageUrl) return;
+    els.photoLightboxImage.src = imageUrl;
+    els.photoLightboxImage.alt = name || "";
+    els.photoLightbox.hidden = false;
+    els.photoLightbox.setAttribute("aria-hidden", "false");
+    document.body.classList.add("lightbox-open");
+}
+
+function closePhotoLightbox() {
+    els.photoLightbox.hidden = true;
+    els.photoLightbox.setAttribute("aria-hidden", "true");
+    els.photoLightboxImage.src = "";
+    els.photoLightboxImage.alt = "";
+    document.body.classList.remove("lightbox-open");
+}
+
 function saveCartToStorage() {
     try {
         localStorage.setItem(CART_KEY, JSON.stringify({ updatedAt: Date.now(), cart }));
@@ -627,11 +719,33 @@ function bindEvents() {
     });
 
     els.productsList.addEventListener("click", (event) => {
+        const imageButton = event.target.closest(".product-image-btn");
+        if (imageButton) {
+            openPhotoLightbox(imageButton.dataset.image, imageButton.dataset.name);
+            return;
+        }
         const button = event.target.closest(".counter-btn");
         if (!button) return;
         changeCartItemQuantity(button.dataset.id, button.dataset.action);
         renderProducts();
     });
+
+    els.productsList.addEventListener("error", (event) => {
+        const image = event.target.closest(".product-image");
+        if (!image) return;
+        const fallbacks = (image.dataset.fallbacks || "").split("|").filter(Boolean);
+        const next = fallbacks.shift();
+        if (next) {
+            image.dataset.fallbacks = fallbacks.join("|");
+            image.closest(".product-image-btn")?.setAttribute("data-image", next);
+            image.src = next;
+            return;
+        }
+        const media = image.closest(".product-media");
+        if (media) {
+            media.innerHTML = "<span class=\"product-placeholder\" aria-hidden=\"true\">DD</span>";
+        }
+    }, true);
 
     els.cartItems.addEventListener("click", (event) => {
         const button = event.target.closest(".cart-counter-btn");
@@ -643,6 +757,11 @@ function bindEvents() {
 
     els.searchInput.addEventListener("input", () => {
         renderProducts();
+    });
+
+    els.photoLightboxClose.addEventListener("click", closePhotoLightbox);
+    els.photoLightbox.addEventListener("click", (event) => {
+        if (event.target === els.photoLightbox) closePhotoLightbox();
     });
 
     document.querySelectorAll(".nav-btn").forEach((button) => {
@@ -679,7 +798,7 @@ async function init() {
     updateCartBadge();
     renderCategories();
     renderProducts();
-    await fetchProductsFromSheets();
+    await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets()]);
     renderCategories();
     renderProducts();
 
@@ -688,7 +807,7 @@ async function init() {
 
     setInterval(async () => {
         if (document.hidden) return;
-        const updated = await fetchProductsFromSheets();
+        const [updated] = await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets()]);
         if (updated) {
             renderCategories();
             renderProducts();

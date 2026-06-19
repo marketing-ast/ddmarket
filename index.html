@@ -26,7 +26,7 @@
             <p class="brand-tagline">Свежие продукты рядом</p>
         </div>
 
-        <section class="notice-panel" aria-label="Преимущества магазина">
+        <section id="notice-panel" class="notice-panel" aria-label="Преимущества магазина">
             <p><strong>Прямые поставки</strong><span>Без посредников в РК</span></p>
             <p><strong>7-я доставка</strong><span>Бесплатная</span></p>
             <p><strong>30% кешбэк</strong><span>На третью покупку</span></p>
@@ -131,6 +131,13 @@
             <span id="cart-badge" class="cart-badge" hidden>0</span>
         </button>
     </nav>
+
+    <div id="photo-lightbox" class="photo-lightbox" aria-hidden="true" hidden>
+        <div class="photo-lightbox-frame" role="dialog" aria-modal="true" aria-label="Фото товара">
+            <img id="photo-lightbox-image" class="photo-lightbox-image" src="" alt="">
+            <button id="photo-lightbox-close" class="photo-lightbox-close" type="button" aria-label="Закрыть фото">×</button>
+        </div>
+    </div>
 
     <script src="app.js" defer></script>
 </body>
