@@ -1,9 +1,9 @@
 "use strict";
 
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
-const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv";
+const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv&range=A1:C10";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
-const WHATSAPP_PHONE = "77785252162";
+const FALLBACK_WHATSAPP_PHONE = "77785252162";
 const CACHE_KEY = "ddmarket_products_v6";
 const CACHE_TIME_KEY = "ddmarket_products_ts_v6";
 const CART_KEY = "ddmarket_cart_v3";
@@ -86,11 +86,13 @@ let cart = {};
 let activeSuperCategory = null;
 let activeCategory = null;
 let refreshInProgress = false;
+let whatsappPhone = FALLBACK_WHATSAPP_PHONE;
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
     productsList: $("#products-list"),
     noticePanel: $("#notice-panel"),
+    brandTagline: $(".brand-tagline"),
     emptyState: $("#empty-state"),
     searchInput: $("#search-input"),
     supercategoriesBar: $("#supercategories-bar"),
@@ -298,17 +300,32 @@ function parseCSVLine(line) {
 
 function normalizePromos(rawPromos) {
     return rawPromos
-        .map((item, index) => {
+        .map((item) => {
             const slot = Number.parseInt(cleanText(item.slot), 10);
             return {
-                slot: Number.isFinite(slot) ? slot : index + 1,
+                slot,
                 title: cleanText(item.title),
                 subtitle: cleanText(item.subtitle),
             };
         })
-        .filter((item) => item.title || item.subtitle)
+        .filter((item) => Number.isFinite(item.slot) && (item.title || item.subtitle))
         .sort((a, b) => a.slot - b.slot)
         .slice(0, 3);
+}
+
+function normalizeSiteSettings(rows) {
+    return rows.reduce((settings, row) => {
+        const key = cleanText(row.slot).toLowerCase();
+        const value = cleanText(row.title);
+        if (key === "phone") settings.phone = value;
+        if (key === "brand_tagline") settings.brandTagline = value;
+        return settings;
+    }, {});
+}
+
+function sanitizeWhatsappPhone(value) {
+    const digits = cleanText(value).replace(/\D/g, "");
+    return digits.length >= 8 ? digits : FALLBACK_WHATSAPP_PHONE;
 }
 
 function renderNoticePromos(promos) {
@@ -323,10 +340,24 @@ function renderNoticePromos(promos) {
     return true;
 }
 
+function applySiteSettings(settings) {
+    const brandTagline = cleanText(settings.brandTagline);
+    if (brandTagline) els.brandTagline.textContent = brandTagline;
+    whatsappPhone = sanitizeWhatsappPhone(settings.phone);
+}
+
+function applySiteConfigRows(rows) {
+    const promosApplied = renderNoticePromos(rows);
+    applySiteSettings(normalizeSiteSettings(rows));
+    return promosApplied;
+}
+
 async function fetchPromosFromSheets() {
     try {
-        const parsedPromos = await loadPromosFromUrl(SITE_PROMOS_CSV_URL);
-        return renderNoticePromos(parsedPromos);
+        const parsedRows = await loadPromosFromUrl(SITE_PROMOS_CSV_URL);
+        const applied = applySiteConfigRows(parsedRows);
+        if ($("#cart-screen").classList.contains("active")) renderCart();
+        return applied;
     } catch (error) {
         console.warn("[DD Market] Promo sheet is unavailable.", error);
         return false;
@@ -339,8 +370,8 @@ async function loadPromosFromUrl(url) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const csvText = await response.text();
-    const parsed = normalizePromos(parseCSV(csvText));
-    if (parsed.length === 0) throw new Error("Empty promos");
+    const parsed = parseCSV(csvText);
+    if (parsed.length === 0) throw new Error("Empty site config");
     return parsed;
 }
 
@@ -617,7 +648,7 @@ function renderCart() {
     const orderText = buildOrderText(items);
     els.cartText.textContent = orderText;
     els.cartTotalPrice.textContent = formatPrice(getCartTotal(items));
-    els.whatsappBtn.href = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(orderText)}`;
+    els.whatsappBtn.href = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(orderText)}`;
     els.copyCartBtn.dataset.copyText = orderText;
 }
 

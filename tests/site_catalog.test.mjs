@@ -241,3 +241,60 @@ test("renders notice promos with only present title and subtitle values", () => 
     assert.match(html, /<p><span>Бесплатная<\/span><\/p>/);
     assert.match(html, /<p><strong>30% кешбэк<\/strong><\/p>/);
 });
+
+test("keeps settings rows out of notice promos", () => {
+    const { context } = loadApp();
+
+    const promos = context.normalizePromos([
+        { slot: "1", title: "Promo one", subtitle: "Sub one" },
+        { slot: "phone", title: "77785252162", subtitle: "" },
+        { slot: "brand_tagline", title: "Fresh test tagline", subtitle: "" },
+        { slot: "2", title: "Promo two", subtitle: "Sub two" },
+    ]);
+
+    assert.equal(JSON.stringify(promos), JSON.stringify([
+        { slot: 1, title: "Promo one", subtitle: "Sub one" },
+        { slot: 2, title: "Promo two", subtitle: "Sub two" },
+    ]));
+});
+
+test("applies brand tagline from site settings rows", () => {
+    const { context, elements } = loadApp();
+
+    context.applySiteConfigRows([
+        { slot: "1", title: "Promo", subtitle: "Sub" },
+        { slot: "brand_tagline", title: "Fresh test tagline", subtitle: "" },
+    ]);
+
+    assert.equal(elements.get(".brand-tagline").textContent, "Fresh test tagline");
+});
+
+test("applies phone from site settings without changing order text", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        {
+            id: "010001",
+            publish: "yes",
+            barcode: "2000000177625",
+            name: "Test Product",
+            unit: "pc",
+            category0: "Catalog",
+            category1: "Category",
+            availability: "in stock",
+            price: "100",
+        },
+    ]);
+    context.applySiteConfigRows([
+        { slot: "phone", title: "+7 (701) 555-44-33", subtitle: "" },
+    ]);
+    context.changeCartItemQuantity("010001", "plus");
+    context.renderCart();
+
+    const href = elements.get("#whatsapp-btn").href;
+    const url = new URL(href);
+
+    assert.equal(url.origin + url.pathname, "https://wa.me/77015554433");
+    assert.match(url.searchParams.get("text"), /Test Product - 1/);
+    assert.match(url.searchParams.get("text"), /100/);
+});
