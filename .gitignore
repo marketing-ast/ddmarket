@@ -3,6 +3,7 @@ buffer/
 .local/
 logo/
 old/
+products/
 .DS_Store
 Thumbs.db
 *.log

@@ -198,15 +198,15 @@ function localProductImageUrl(product, extension = "jpg") {
 
 function productImageCandidates(product) {
     const explicitImage = cleanText(product?.image);
+    if (explicitImage) return [explicitImage];
     const primary = localProductImageUrl(product, "jpg");
-    const localCandidates = primary ? [
+    if (!primary) return [];
+    return [
         primary,
         localProductImageUrl(product, "webp"),
         localProductImageUrl(product, "png"),
         localProductImageUrl(product, "jpeg"),
-    ] : [];
-    if (explicitImage) return [...localCandidates, explicitImage];
-    return localCandidates;
+    ];
 }
 
 function normalizeUnitInfo(value) {
