@@ -120,7 +120,7 @@ test("renders product photos as lightbox buttons", () => {
     assert.match(html, /class="product-image"/);
 });
 
-test("uses local barcode photo fallback when sheet image is empty", () => {
+test("uses DD placeholder when sheet image is empty", () => {
     const { context } = loadApp();
 
     const product = {
@@ -134,19 +134,13 @@ test("uses local barcode photo fallback when sheet image is empty", () => {
         image: "",
     };
     const html = context.renderProductCard(product);
-    const expectedJpg = context.localProductImageUrl(product, "jpg");
-    const expectedWebp = context.localProductImageUrl(product, "webp");
-    const expectedPng = context.localProductImageUrl(product, "png");
-    const expectedJpeg = context.localProductImageUrl(product, "jpeg");
 
-    assert.match(html, /class="product-image-btn"/);
-    assert.equal(expectedJpg, "products/%D0%9E%D0%92%D0%9E%D0%A9%D0%98-%D0%A4%D0%A0%D0%A3%D0%9A%D0%A2%D0%AB/%D0%9E%D0%92%D0%9E%D0%A9%D0%98/2000000177625.jpg");
-    assert.ok(html.includes(`data-image="${expectedJpg}"`));
-    assert.ok(html.includes(`data-fallbacks="${expectedWebp}|${expectedPng}|${expectedJpeg}"`));
-    assert.ok(html.includes(`src="${expectedJpg}"`));
+    assert.doesNotMatch(html, /class="product-image-btn"/);
+    assert.doesNotMatch(html, /products\//);
+    assert.match(html, /class="product-placeholder"/);
 });
 
-test("prefers sheet image url before local barcode photo", () => {
+test("uses sheet image url as the only product image source", () => {
     const { context } = loadApp();
 
     const product = {
@@ -160,11 +154,10 @@ test("prefers sheet image url before local barcode photo", () => {
         image: "https://img.ddmarket.kz/items/products/2200009857621.webp?v=old",
     };
     const html = context.renderProductCard(product);
-    const expectedJpg = context.localProductImageUrl(product, "jpg");
 
     assert.ok(html.includes(`data-image="https://img.ddmarket.kz/items/products/2200009857621.webp?v=old"`));
     assert.ok(html.includes(`src="https://img.ddmarket.kz/items/products/2200009857621.webp?v=old"`));
-    assert.ok(!html.includes(`data-image="${expectedJpg}"`));
+    assert.ok(!html.includes("data-fallbacks=\"products/"));
 });
 
 test("product thumbnails fit inside media frame without cropping", () => {

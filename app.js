@@ -177,36 +177,9 @@ function normalizeImageUrl(value) {
     return raw;
 }
 
-function localProductPathSegment(value) {
-    const segment = cleanText(value)
-        .replace(/[<>:"/\\|?*\u0000-\u001F]+/g, "-")
-        .replace(/\s+/g, " ")
-        .replace(/^[.\s]+|[.\s]+$/g, "");
-    return segment || "_Без категории";
-}
-
-function localProductImageUrl(product, extension = "jpg") {
-    const barcode = cleanText(product?.barcode).replace(/[^\dA-Za-z_-]/g, "");
-    if (!barcode) return "";
-    const category0 = localProductPathSegment(product?.category0);
-    const category1 = localProductPathSegment(product?.category1);
-    const safeExtension = cleanText(extension).replace(/[^a-z0-9]/gi, "") || "jpg";
-    return ["products", category0, category1, `${barcode}.${safeExtension}`]
-        .map((segment) => encodeURIComponent(segment))
-        .join("/");
-}
-
 function productImageCandidates(product) {
     const explicitImage = cleanText(product?.image);
-    if (explicitImage) return [explicitImage];
-    const primary = localProductImageUrl(product, "jpg");
-    if (!primary) return [];
-    return [
-        primary,
-        localProductImageUrl(product, "webp"),
-        localProductImageUrl(product, "png"),
-        localProductImageUrl(product, "jpeg"),
-    ];
+    return explicitImage ? [explicitImage] : [];
 }
 
 function normalizeUnitInfo(value) {
