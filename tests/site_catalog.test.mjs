@@ -146,6 +146,27 @@ test("uses local barcode photo fallback when sheet image is empty", () => {
     assert.ok(html.includes(`src="${expectedJpg}"`));
 });
 
+test("prefers local barcode photo before sheet image url", () => {
+    const { context } = loadApp();
+
+    const product = {
+        id: "150005",
+        barcode: "2200009857621",
+        name: "DD product",
+        unit: "шт",
+        category0: "МЯСНОЙ ПРОДУКТ",
+        category1: "КУРИЦА",
+        price: 3099,
+        image: "https://img.ddmarket.kz/items/products/2200009857621.webp?v=old",
+    };
+    const html = context.renderProductCard(product);
+    const expectedJpg = context.localProductImageUrl(product, "jpg");
+
+    assert.ok(html.includes(`data-image="${expectedJpg}"`));
+    assert.ok(html.includes("https://img.ddmarket.kz/items/products/2200009857621.webp?v=old"));
+    assert.ok(html.includes(`src="${expectedJpg}"`));
+});
+
 test("product thumbnails fit inside media frame without cropping", () => {
     const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
     const productImageRule = css.match(/\.product-image\s*\{[^}]+\}/)?.[0] ?? "";
