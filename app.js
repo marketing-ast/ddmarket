@@ -1,9 +1,11 @@
 "use strict";
 
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
-const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv&range=A1:C10";
+const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv&range=A1:C20";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const FALLBACK_WHATSAPP_PHONE = "77785252162";
+const DEFAULT_MIN_ORDER_AMOUNT = 12000;
+const DEFAULT_FREE_DELIVERY_AMOUNT = 30000;
 const CACHE_KEY = "ddmarket_products_v6";
 const CACHE_TIME_KEY = "ddmarket_products_ts_v6";
 const CART_KEY = "ddmarket_cart_v3";
@@ -87,6 +89,10 @@ let activeSuperCategory = null;
 let activeCategory = null;
 let refreshInProgress = false;
 let whatsappPhone = FALLBACK_WHATSAPP_PHONE;
+let orderSettings = {
+    minOrderAmount: DEFAULT_MIN_ORDER_AMOUNT,
+    freeDeliveryAmount: DEFAULT_FREE_DELIVERY_AMOUNT,
+};
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
@@ -103,6 +109,8 @@ const els = {
     cartSummary: $("#cart-summary"),
     cartText: $("#cart-text"),
     cartTotalPrice: $("#cart-total-price"),
+    cartOrderGate: $("#cart-order-gate"),
+    cartDeliveryProgress: $("#cart-delivery-progress"),
     cartBadge: $("#cart-badge"),
     whatsappBtn: $("#whatsapp-btn"),
     copyCartBtn: $("#copy-cart-btn"),
@@ -292,6 +300,8 @@ function normalizeSiteSettings(rows) {
         const value = cleanText(row.title);
         if (key === "phone") settings.phone = value;
         if (key === "brand_tagline") settings.brandTagline = value;
+        if (["min_order_amount", "minimum_order_amount"].includes(key)) settings.minOrderAmount = value;
+        if (["free_delivery_amount", "free_delivery_threshold"].includes(key)) settings.freeDeliveryAmount = value;
         return settings;
     }, {});
 }
@@ -299,6 +309,11 @@ function normalizeSiteSettings(rows) {
 function sanitizeWhatsappPhone(value) {
     const digits = cleanText(value).replace(/\D/g, "");
     return digits.length >= 8 ? digits : FALLBACK_WHATSAPP_PHONE;
+}
+
+function sanitizeMoneySetting(value, fallback) {
+    const parsed = parsePrice(value);
+    return parsed > 0 ? parsed : fallback;
 }
 
 function renderNoticePromos(promos) {
@@ -317,6 +332,10 @@ function applySiteSettings(settings) {
     const brandTagline = cleanText(settings.brandTagline);
     if (brandTagline) els.brandTagline.textContent = brandTagline;
     whatsappPhone = sanitizeWhatsappPhone(settings.phone);
+    orderSettings = {
+        minOrderAmount: sanitizeMoneySetting(settings.minOrderAmount, DEFAULT_MIN_ORDER_AMOUNT),
+        freeDeliveryAmount: sanitizeMoneySetting(settings.freeDeliveryAmount, DEFAULT_FREE_DELIVERY_AMOUNT),
+    };
 }
 
 function applySiteConfigRows(rows) {
@@ -597,9 +616,12 @@ function getCartItems() {
 
 function renderCart() {
     const items = getCartItems();
+    const cartTotal = getCartTotal(items);
+    const hasItems = items.length > 0;
+    const meetsMinimumOrder = cartTotal >= orderSettings.minOrderAmount;
     els.cartEmpty.hidden = items.length > 0;
     els.cartSummary.hidden = items.length === 0;
-    els.whatsappBtn.hidden = items.length === 0;
+    els.whatsappBtn.hidden = !hasItems || !meetsMinimumOrder;
 
     els.cartItems.innerHTML = items.map((item) => `
         <div class="cart-item">
@@ -620,13 +642,38 @@ function renderCart() {
 
     const orderText = buildOrderText(items);
     els.cartText.textContent = orderText;
-    els.cartTotalPrice.textContent = formatPrice(getCartTotal(items));
+    els.cartTotalPrice.textContent = formatPrice(cartTotal);
+    renderCartThresholds(cartTotal, hasItems);
     els.whatsappBtn.href = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(orderText)}`;
     els.copyCartBtn.dataset.copyText = orderText;
 }
 
 function getCartTotal(items) {
     return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+}
+
+function renderCartThresholds(cartTotal, hasItems) {
+    if (!hasItems) {
+        els.cartOrderGate.hidden = true;
+        els.cartDeliveryProgress.hidden = true;
+        return;
+    }
+
+    if (cartTotal < orderSettings.minOrderAmount) {
+        els.cartOrderGate.hidden = false;
+        els.cartOrderGate.textContent = `Минимальный заказ ${formatPrice(orderSettings.minOrderAmount)}. Добавьте еще ${formatPrice(orderSettings.minOrderAmount - cartTotal)}.`;
+    } else {
+        els.cartOrderGate.hidden = true;
+        els.cartOrderGate.textContent = "";
+    }
+
+    els.cartDeliveryProgress.hidden = false;
+    if (cartTotal < orderSettings.freeDeliveryAmount) {
+        els.cartDeliveryProgress.textContent = `До бесплатной доставки осталось ${formatPrice(orderSettings.freeDeliveryAmount - cartTotal)}.`;
+        return;
+    }
+
+    els.cartDeliveryProgress.textContent = "Поздравляем, доставка будет бесплатной.";
 }
 
 function buildOrderText(items) {

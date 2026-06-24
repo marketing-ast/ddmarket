@@ -312,3 +312,99 @@ test("applies phone from site settings without changing order text", () => {
     assert.match(url.searchParams.get("text"), /Test Product - 1/);
     assert.match(url.searchParams.get("text"), /100/);
 });
+
+test("keeps WhatsApp order hidden until the minimum order amount is reached", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        {
+            id: "010001",
+            publish: "yes",
+            barcode: "2000000177625",
+            name: "Test Product",
+            unit: "pc",
+            category0: "Catalog",
+            category1: "Category",
+            availability: "in stock",
+            price: "7000",
+        },
+    ]);
+    context.applySiteConfigRows([
+        { slot: "min_order_amount", title: "12000", subtitle: "" },
+        { slot: "free_delivery_amount", title: "30000", subtitle: "" },
+    ]);
+    context.changeCartItemQuantity("010001", "plus");
+    context.renderCart();
+
+    assert.equal(elements.get("#whatsapp-btn").hidden, true);
+    assert.equal(
+        elements.get("#cart-order-gate").textContent,
+        "Минимальный заказ 12\u00a0000 тг. Добавьте еще 5\u00a0000 тг.",
+    );
+    assert.equal(
+        elements.get("#cart-delivery-progress").textContent,
+        "До бесплатной доставки осталось 23\u00a0000 тг.",
+    );
+});
+
+test("shows WhatsApp order after minimum amount while keeping free delivery progress", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        {
+            id: "010001",
+            publish: "yes",
+            barcode: "2000000177625",
+            name: "Test Product",
+            unit: "pc",
+            category0: "Catalog",
+            category1: "Category",
+            availability: "in stock",
+            price: "12000",
+        },
+    ]);
+    context.applySiteConfigRows([
+        { slot: "min_order_amount", title: "12000", subtitle: "" },
+        { slot: "free_delivery_amount", title: "30000", subtitle: "" },
+    ]);
+    context.changeCartItemQuantity("010001", "plus");
+    context.renderCart();
+
+    assert.equal(elements.get("#whatsapp-btn").hidden, false);
+    assert.equal(elements.get("#cart-order-gate").hidden, true);
+    assert.equal(
+        elements.get("#cart-delivery-progress").textContent,
+        "До бесплатной доставки осталось 18\u00a0000 тг.",
+    );
+});
+
+test("shows free delivery confirmation after threshold is reached", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        {
+            id: "010001",
+            publish: "yes",
+            barcode: "2000000177625",
+            name: "Test Product",
+            unit: "pc",
+            category0: "Catalog",
+            category1: "Category",
+            availability: "in stock",
+            price: "30000",
+        },
+    ]);
+    context.applySiteConfigRows([
+        { slot: "min_order_amount", title: "12000", subtitle: "" },
+        { slot: "free_delivery_amount", title: "30000", subtitle: "" },
+    ]);
+    context.changeCartItemQuantity("010001", "plus");
+    context.renderCart();
+
+    assert.equal(elements.get("#whatsapp-btn").hidden, false);
+    assert.equal(elements.get("#cart-order-gate").hidden, true);
+    assert.equal(
+        elements.get("#cart-delivery-progress").textContent,
+        "Поздравляем, доставка будет бесплатной.",
+    );
+});

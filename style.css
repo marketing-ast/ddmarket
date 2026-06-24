@@ -801,6 +801,28 @@ body.lightbox-open {
     font-variant-numeric: tabular-nums;
 }
 
+.cart-threshold-note {
+    margin: 10px 0 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 11px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.cart-threshold-note--order {
+    border-color: #f1d2b9;
+    background: #fff8f2;
+}
+
+.cart-threshold-note--delivery {
+    border-color: rgba(65, 135, 52, 0.24);
+    background: var(--surface-green);
+    color: var(--green-dark);
+}
+
 .cart-note {
     margin: 9px 0 0;
     color: var(--muted);
