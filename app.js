@@ -6,8 +6,8 @@ const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const FALLBACK_WHATSAPP_PHONE = "77785252162";
 const DEFAULT_MIN_ORDER_AMOUNT = 12000;
 const DEFAULT_FREE_DELIVERY_AMOUNT = 30000;
-const CACHE_KEY = "ddmarket_products_v6";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v6";
+const CACHE_KEY = "ddmarket_products_v7";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v7";
 const CART_KEY = "ddmarket_cart_v3";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -16,6 +16,8 @@ const UNIT_KG = "кг";
 const UNIT_PC = "шт";
 const FALLBACK_CATEGORY0 = "Продукты";
 const FALLBACK_CATEGORY1 = "Другое";
+const UNIT_GRAM = "\u0433\u0440\u0430\u043c\u043c";
+const UNIT_100_GRAM = "100 \u0433\u0440\u0430\u043c\u043c";
 const CATEGORY0_ORDER = [
     "ОВОЩИ/ФРУКТЫ",
     "ГОТОВИМ САМИ",
@@ -148,6 +150,9 @@ function normalizeProducts(rawProducts) {
                 sale: parseSaleValue(item.sale),
                 image: normalizeImageUrl(item.image),
                 quantityStep: unitInfo.quantityStep,
+                quantityPriceFactor: unitInfo.quantityPriceFactor,
+                priceUnit: unitInfo.priceUnit,
+                isWeighted: unitInfo.isWeighted,
             };
         })
         .filter((item) => (
@@ -196,24 +201,44 @@ function normalizeUnitInfo(value) {
     if (gramsMatch) {
         const grams = Number.parseFloat(gramsMatch[1]);
         if (Number.isFinite(grams) && grams > 0) {
-            return { unit: UNIT_KG, quantityStep: roundQty(grams / 1000) };
+            if (isHundredGramUnit(grams / 1000)) {
+                return hundredGramUnitInfo();
+            }
+            return { unit: UNIT_KG, priceUnit: UNIT_KG, quantityStep: roundQty(grams / 1000), quantityPriceFactor: 1, isWeighted: true };
         }
     }
 
     const numericUnit = Number.parseFloat(rawUnit);
     if (Number.isFinite(numericUnit) && numericUnit > 0) {
-        return { unit: UNIT_KG, quantityStep: roundQty(numericUnit) };
+        if (isHundredGramUnit(numericUnit)) {
+            return hundredGramUnitInfo();
+        }
+        return { unit: UNIT_KG, priceUnit: UNIT_KG, quantityStep: roundQty(numericUnit), quantityPriceFactor: 1, isWeighted: true };
     }
 
     if (rawUnit.includes("кг") || rawUnit.includes("kg")) {
-        return { unit: UNIT_KG, quantityStep: 1 };
+        return { unit: UNIT_KG, priceUnit: UNIT_KG, quantityStep: 1, quantityPriceFactor: 1, isWeighted: true };
     }
 
     if (rawUnit.includes("шт") || rawUnit.includes("pc") || rawUnit.includes("pcs")) {
-        return { unit: UNIT_PC, quantityStep: 1 };
+        return { unit: UNIT_PC, priceUnit: UNIT_PC, quantityStep: 1, quantityPriceFactor: 1, isWeighted: false };
     }
 
-    return { unit: rawUnit || UNIT_PC, quantityStep: 1 };
+    return { unit: rawUnit || UNIT_PC, priceUnit: rawUnit || UNIT_PC, quantityStep: 1, quantityPriceFactor: 1, isWeighted: false };
+}
+
+function isHundredGramUnit(value) {
+    return Math.abs(Number(value) - 0.1) < 0.000001;
+}
+
+function hundredGramUnitInfo() {
+    return {
+        unit: UNIT_GRAM,
+        priceUnit: UNIT_100_GRAM,
+        quantityStep: 100,
+        quantityPriceFactor: 0.01,
+        isWeighted: true,
+    };
 }
 
 function parsePrice(value) {
@@ -388,7 +413,7 @@ async function fetchProductsFromSheets() {
         setProducts(parsedProducts);
         const now = Date.now();
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(products));
+            localStorage.setItem(CACHE_KEY, JSON.stringify(parsedProducts));
             localStorage.setItem(CACHE_TIME_KEY, String(now));
         } catch {
             // Cache is optional.
@@ -418,7 +443,7 @@ async function loadCatalogFromUrl(url) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const csvText = await response.text();
-    const parsed = normalizeProducts(parseCSV(csvText));
+    const parsed = parseCSV(csvText);
     if (parsed.length === 0) throw new Error("Empty catalog");
     return parsed;
 }
@@ -540,7 +565,8 @@ function renderProducts() {
 
 function renderProductCard(product) {
     const qty = cart[product.id] || 0;
-    const unitLabel = product.unit === UNIT_KG ? "весовой" : "штучный";
+    const unitLabel = (product.isWeighted ?? product.unit === UNIT_KG) ? "весовой" : "штучный";
+    const priceUnit = product.priceUnit || product.unit;
     const priceMissing = product.price >= 100000;
     const imageCandidates = productImageCandidates(product);
     const image = imageCandidates[0] || "";
@@ -558,7 +584,7 @@ function renderProductCard(product) {
             </div>
             <div class="product-info">
                 <h3 class="product-name">${escapeHtml(product.name)}</h3>
-                <div class="product-price">${formatPrice(product.price)} / ${escapeHtml(product.unit)}</div>
+                <div class="product-price">${formatPrice(product.price)} / ${escapeHtml(priceUnit)}</div>
             </div>
             <div class="counter" aria-label="Количество ${escapeHtml(product.name)}">
                 <button class="counter-btn minus" type="button" data-id="${product.id}" data-action="minus" aria-label="Уменьшить количество ${escapeHtml(product.name)}">-</button>
@@ -627,7 +653,7 @@ function renderCart() {
         <div class="cart-item">
             <div>
                 <span class="cart-item-name">${escapeHtml(item.name)}</span>
-                <span class="cart-item-price">${formatPrice(item.price * item.qty)}</span>
+                <span class="cart-item-price">${formatPrice(getCartItemTotal(item))}</span>
             </div>
             <div class="counter">
                 <button class="counter-btn minus cart-counter-btn" type="button" data-id="${item.id}" data-action="minus" aria-label="Уменьшить количество ${escapeHtml(item.name)}">-</button>
@@ -648,8 +674,12 @@ function renderCart() {
     els.copyCartBtn.dataset.copyText = orderText;
 }
 
+function getCartItemTotal(item) {
+    return item.price * item.qty * (item.quantityPriceFactor || 1);
+}
+
 function getCartTotal(items) {
-    return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+    return items.reduce((sum, item) => sum + getCartItemTotal(item), 0);
 }
 
 function renderCartThresholds(cartTotal, hasItems) {

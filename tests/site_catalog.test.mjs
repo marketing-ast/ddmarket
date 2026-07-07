@@ -69,7 +69,7 @@ function loadApp() {
         .replace(/\r?\ninit\(\);\s*$/, "");
     vm.runInNewContext(appSource, context, { filename: "app.js" });
 
-    return { context, elements };
+    return { context, elements, localStorageData };
 }
 
 test("normalizes only published products with barcode, price, and stock", () => {
@@ -311,6 +311,87 @@ test("applies phone from site settings without changing order text", () => {
     assert.equal(url.origin + url.pathname, "https://wa.me/77015554433");
     assert.match(url.searchParams.get("text"), /Test Product - 1/);
     assert.match(url.searchParams.get("text"), /100/);
+});
+
+test("treats 0,1 unit as 100 gram portions", () => {
+    const { context } = loadApp();
+
+    const [product] = context.normalizeProducts([
+        {
+            id: "040009",
+            publish: "yes",
+            barcode: "2000000177621",
+            name: "Parsley",
+            unit: "0,1",
+            category0: "Catalog",
+            category1: "Greens",
+            availability: "in stock",
+            price: "312",
+        },
+    ]);
+
+    assert.equal(product.quantityStep, 100);
+    assert.equal(product.quantityPriceFactor, 0.01);
+    const productHtml = context.renderProductCard(product);
+    assert.match(productHtml, /312.+\/.+100/s);
+    assert.match(productHtml, />весовой</);
+
+    context.setProducts([
+        {
+            id: "040009",
+            publish: "yes",
+            barcode: "2000000177621",
+            name: "Parsley",
+            unit: "0,1",
+            category0: "Catalog",
+            category1: "Greens",
+            availability: "in stock",
+            price: "312",
+        },
+    ]);
+    for (let index = 0; index < 5; index += 1) {
+        context.changeCartItemQuantity("040009", "plus");
+    }
+
+    const items = context.getCartItems();
+
+    assert.equal(items[0].qty, 500);
+    assert.equal(context.getCartTotal(items), 1560);
+    assert.match(context.buildOrderText(items), /Parsley - 500/);
+});
+
+test("ignores stale v6 catalog cache when loading 100 gram units", async () => {
+    const { context, localStorageData } = loadApp();
+    localStorageData.set("ddmarket_products_v6", JSON.stringify([
+        {
+            id: "040009",
+            publish: true,
+            barcode: "2000000177621",
+            name: "Parsley",
+            unit: "кг",
+            category0: "Catalog",
+            category1: "Greens",
+            availability: "in stock",
+            price: 312,
+            quantityStep: 0.1,
+        },
+    ]));
+    localStorageData.set("ddmarket_products_ts_v6", String(Date.now()));
+    context.fetch = async () => ({
+        ok: true,
+        text: async () => [
+            "id,publish,barcode,name,unit,category0,category1,availability,price",
+            "040009,yes,2000000177621,Parsley,\"0,1\",Catalog,Greens,in stock,312",
+        ].join("\n"),
+    });
+
+    await context.fetchProductsFromSheets();
+    const product = context.getCartItems().length;
+    const [freshProduct] = context.normalizeProducts(JSON.parse(localStorageData.get("ddmarket_products_v7")));
+
+    assert.equal(product, 0);
+    assert.equal(freshProduct.unit, "грамм");
+    assert.equal(freshProduct.priceUnit, "100 грамм");
 });
 
 test("keeps WhatsApp order hidden until the minimum order amount is reached", () => {
