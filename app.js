@@ -16,6 +16,7 @@ const UNIT_KG = "кг";
 const UNIT_PC = "шт";
 const FALLBACK_CATEGORY0 = "Продукты";
 const FALLBACK_CATEGORY1 = "Другое";
+const SALE_VIEW_ID = "__sale__";
 const UNIT_GRAM = "\u0433\u0440\u0430\u043c\u043c";
 const UNIT_100_GRAM = "100 \u0433\u0440\u0430\u043c\u043c";
 const CATEGORY0_ORDER = [
@@ -496,30 +497,44 @@ function getCategoriesForSuperCategory(category0) {
 
 function renderCategories() {
     const superCategories = getSuperCategories();
-    if (!superCategories.includes(activeSuperCategory)) {
-        activeSuperCategory = superCategories[0] || null;
+    const hasSale = products.some((item) => item.sale);
+    const availableViews = [
+        ...(hasSale ? [SALE_VIEW_ID] : []),
+        ...superCategories,
+    ];
+
+    if (!availableViews.includes(activeSuperCategory)) {
+        activeSuperCategory = availableViews[0] || null;
     }
 
-    els.supercategoriesBar.innerHTML = superCategories.map((category) => `
-        <button class="super-chip${category === activeSuperCategory ? " active" : ""}" type="button" data-super-category="${escapeHtml(category)}">
-            ${escapeHtml(category)}
+    const superCategoryItems = [
+        ...(hasSale ? [{ id: SALE_VIEW_ID, label: "Акции", sale: true }] : []),
+        ...superCategories.map((category) => ({ id: category, label: category, sale: false })),
+    ];
+
+    els.supercategoriesBar.innerHTML = superCategoryItems.map((category) => `
+        <button class="super-chip${category.sale ? " sale-super-chip" : ""}${category.id === activeSuperCategory ? " active" : ""}" type="button" data-super-category="${escapeHtml(category.id)}">
+            ${escapeHtml(category.label)}
         </button>
     `).join("");
 
-    const scopedProducts = products.filter((item) => item.category0 === activeSuperCategory);
-    const hasSale = scopedProducts.some((item) => item.sale);
-    const categories = [
-        ...(hasSale ? [{ id: "sale", label: "Акции", sale: true }] : []),
-        ...getCategoriesForSuperCategory(activeSuperCategory)
-            .map((category1) => ({ id: category1, label: category1, sale: false })),
-    ];
+    const isSaleView = activeSuperCategory === SALE_VIEW_ID;
+    els.categoriesBar.hidden = isSaleView;
+    if (isSaleView) {
+        activeCategory = null;
+        els.categoriesBar.innerHTML = "";
+        return;
+    }
+
+    const categories = getCategoriesForSuperCategory(activeSuperCategory)
+        .map((category1) => ({ id: category1, label: category1 }));
 
     if (!categories.some((category) => category.id === activeCategory)) {
         activeCategory = categories[0]?.id || null;
     }
 
     els.categoriesBar.innerHTML = categories.map((category) => `
-        <button class="cat-chip${category.sale ? " sale-chip" : ""}${category.id === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category.id)}">
+        <button class="cat-chip${category.id === activeCategory ? " active" : ""}" type="button" data-category="${escapeHtml(category.id)}">
             ${escapeHtml(category.label)}
         </button>
     `).join("");
@@ -527,9 +542,10 @@ function renderCategories() {
 
 function getFilteredProducts() {
     const query = cleanText(els.searchInput.value).toLowerCase();
+    const isSaleView = activeSuperCategory === SALE_VIEW_ID;
     return products.filter((item) => {
-        const matchesSuperCategory = query ? true : item.category0 === activeSuperCategory;
-        const matchesCategory = query ? true : activeCategory === "sale" ? item.sale : item.category1 === activeCategory;
+        const matchesSuperCategory = query ? true : isSaleView ? item.sale : item.category0 === activeSuperCategory;
+        const matchesCategory = query ? true : isSaleView || item.category1 === activeCategory;
         const matchesQuery = !query
             || item.name.toLowerCase().includes(query)
             || item.name1s.toLowerCase().includes(query)
@@ -551,7 +567,7 @@ function renderProducts() {
     }
 
     const query = cleanText(els.searchInput.value);
-    const title = query ? "Результаты поиска" : activeCategory === "sale" ? "Акции" : activeCategory;
+    const title = query ? "Результаты поиска" : activeSuperCategory === SALE_VIEW_ID ? "Акции" : activeCategory;
     els.productsList.innerHTML = `
         <section class="category-section" aria-label="${escapeHtml(title)}">
             <div class="category-header">
@@ -794,14 +810,18 @@ function escapeHtml(value) {
         .replaceAll("'", "&#039;");
 }
 
+function selectSuperCategory(superCategory) {
+    activeSuperCategory = superCategory;
+    activeCategory = null;
+    renderCategories();
+    renderProducts();
+}
+
 function bindEvents() {
     els.supercategoriesBar.addEventListener("click", (event) => {
         const button = event.target.closest(".super-chip");
         if (!button) return;
-        activeSuperCategory = button.dataset.superCategory;
-        activeCategory = null;
-        renderCategories();
-        renderProducts();
+        selectSuperCategory(button.dataset.superCategory);
     });
 
     els.categoriesBar.addEventListener("click", (event) => {

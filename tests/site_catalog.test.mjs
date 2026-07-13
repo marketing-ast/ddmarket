@@ -207,6 +207,48 @@ test("renders category0 as top navigation and category1 as subnavigation", () =>
     assert.doesNotMatch(elements.get("#categories-bar").innerHTML, /МАКАРОНЫ\/ЛАПША/);
 });
 
+test("renders sale as the first global catalog view instead of a subcategory", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        { id: "010001", publish: "yes", barcode: "2000000177625", name: "Огурцы", unit: "кг", category0: "ОВОЩИ/ФРУКТЫ", category1: "ОВОЩИ", availability: "in stock", price: "399", sale: "yes" },
+        { id: "240001", publish: "yes", barcode: "2000000177627", name: "Лапша", unit: "шт", category0: "БАКАЛЕЯ", category1: "МАКАРОНЫ/ЛАПША", availability: "in stock", price: "399", sale: "yes" },
+        { id: "020001", publish: "yes", barcode: "2000000177626", name: "Яблоко", unit: "кг", category0: "ОВОЩИ/ФРУКТЫ", category1: "ФРУКТЫ", availability: "in stock", price: "599", sale: "no" },
+    ]);
+
+    elements.get("#search-input").value = "";
+    context.renderCategories();
+
+    const topNavigation = elements.get("#supercategories-bar").innerHTML;
+    assert.ok(topNavigation.indexOf("Акции") < topNavigation.indexOf("ОВОЩИ/ФРУКТЫ"));
+    assert.doesNotMatch(elements.get("#categories-bar").innerHTML, /Акции/);
+    assert.equal(elements.get("#categories-bar").hidden, true);
+    assert.deepEqual(context.getFilteredProducts().map((product) => product.id), ["010001", "240001"]);
+});
+
+test("ordinary categories show their subcategories and keep sale products in the product list", () => {
+    const { context, elements } = loadApp();
+
+    context.setProducts([
+        { id: "010001", publish: "yes", barcode: "2000000177625", name: "Огурцы", unit: "кг", category0: "ОВОЩИ/ФРУКТЫ", category1: "ОВОЩИ", availability: "in stock", price: "399", sale: "yes" },
+        { id: "010002", publish: "yes", barcode: "2000000177626", name: "Картофель", unit: "кг", category0: "ОВОЩИ/ФРУКТЫ", category1: "ОВОЩИ", availability: "in stock", price: "219", sale: "no" },
+        { id: "020001", publish: "yes", barcode: "2000000177627", name: "Яблоко", unit: "кг", category0: "ОВОЩИ/ФРУКТЫ", category1: "ФРУКТЫ", availability: "in stock", price: "599", sale: "no" },
+    ]);
+
+    elements.get("#search-input").value = "";
+    context.renderCategories();
+    context.selectSuperCategory("ОВОЩИ/ФРУКТЫ");
+
+    assert.equal(elements.get("#categories-bar").hidden, false);
+    assert.doesNotMatch(elements.get("#categories-bar").innerHTML, /Акции/);
+    assert.match(elements.get("#categories-bar").innerHTML, /ОВОЩИ/);
+    assert.match(elements.get("#categories-bar").innerHTML, /ФРУКТЫ/);
+
+    const filtered = context.getFilteredProducts();
+    assert.deepEqual(filtered.map((product) => product.id), ["010001", "010002"]);
+    assert.match(context.renderProductCard(filtered[0]), /sale-pill/);
+});
+
 test("search matches barcode, category0, and category1 without category filters", () => {
     const { context, elements } = loadApp();
 

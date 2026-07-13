@@ -261,6 +261,10 @@ h1 {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
+.categories-bar[hidden] {
+    display: none;
+}
+
 .supercategories-bar {
     display: flex;
     gap: 7px;
@@ -329,6 +333,18 @@ h1 {
     border-color: var(--green);
     background: var(--green);
     box-shadow: 0 8px 18px rgba(65, 135, 52, 0.22);
+}
+
+.super-chip.sale-super-chip {
+    border-color: rgba(234, 94, 24, 0.5);
+    color: var(--orange);
+}
+
+.super-chip.sale-super-chip.active {
+    border-color: var(--orange-strong);
+    background: var(--orange-strong);
+    color: var(--white);
+    box-shadow: 0 8px 18px rgba(234, 94, 24, 0.22);
 }
 
 .cat-chip.active {
