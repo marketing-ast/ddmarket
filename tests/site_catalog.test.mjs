@@ -134,11 +134,13 @@ test("uses manual_quantity before the automatic 1C quantity", () => {
         { id: "010001", publish: "yes", barcode: "2000000177625", name: "Manual stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "2", manual_quantity: "7" },
         { id: "010002", publish: "yes", barcode: "2000000177626", name: "Manual zero", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "8", manual_quantity: "0" },
         { id: "010003", publish: "yes", barcode: "2000000177627", name: "Automatic stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "3", manual_quantity: "" },
+        { id: "010004", publish: "yes", barcode: "2000000177628", name: "Invalid manual stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "4", manual_quantity: "-1" },
     ]);
 
-    assert.deepEqual(products.map((product) => product.id), ["010001", "010003"]);
+    assert.deepEqual(products.map((product) => product.id), ["010001", "010003", "010004"]);
     assert.equal(products[0].quantity, 7);
     assert.equal(products[1].quantity, 3);
+    assert.equal(products[2].quantity, 4);
 });
 
 test("converts kilogram quantity to 100 gram cart portions", () => {

@@ -138,7 +138,7 @@ function normalizeProducts(rawProducts) {
             const barcode = cleanText(item.barcode);
             const category1 = cleanText(item.category1) || cleanText(item.category) || FALLBACK_CATEGORY1;
             const category0 = cleanText(item.category0) || getCategory0FromLegacyCategory(category1);
-            const manualQuantity = parseQuantity(item.manual_quantity);
+            const manualQuantity = parseManualQuantity(item.manual_quantity, unitInfo);
             return {
                 id,
                 publish: parsePublishValue(item.publish),
@@ -258,6 +258,20 @@ function parseQuantity(value) {
     const parsed = Number(normalized);
     if (!Number.isFinite(parsed)) return null;
     return roundQty(Math.max(0, parsed));
+}
+
+function parseManualQuantity(value, unitInfo) {
+    const raw = cleanText(value);
+    if (!raw) return null;
+
+    const normalized = raw.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+
+    const quantity = roundQty(parsed);
+    const multiplier = unitInfo?.isWeighted ? 10 : 1;
+    if (Math.abs(quantity * multiplier - Math.round(quantity * multiplier)) > 0.000001) return null;
+    return quantity;
 }
 
 function getAvailableCartQuantity(product) {
