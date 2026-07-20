@@ -126,6 +126,7 @@ const els = {
 function setProducts(nextProducts) {
     products = normalizeProducts(nextProducts);
     productsById = new Map(products.map((item) => [item.id, item]));
+    reconcileCartWithProducts();
 }
 
 function normalizeProducts(rawProducts) {
@@ -137,6 +138,7 @@ function normalizeProducts(rawProducts) {
             const barcode = cleanText(item.barcode);
             const category1 = cleanText(item.category1) || cleanText(item.category) || FALLBACK_CATEGORY1;
             const category0 = cleanText(item.category0) || getCategory0FromLegacyCategory(category1);
+            const manualQuantity = parseQuantity(item.manual_quantity);
             return {
                 id,
                 publish: parsePublishValue(item.publish),
@@ -148,6 +150,7 @@ function normalizeProducts(rawProducts) {
                 category1,
                 availability: item.availability,
                 price: parsePrice(item.price),
+                quantity: manualQuantity ?? parseQuantity(item.quantity),
                 sale: parseSaleValue(item.sale),
                 image: normalizeImageUrl(item.image),
                 quantityStep: unitInfo.quantityStep,
@@ -162,6 +165,7 @@ function normalizeProducts(rawProducts) {
             && item.name
             && item.price > 0
             && parseAvailabilityValue(item.availability)
+            && hasStockForSale(item)
         ));
 }
 
@@ -244,6 +248,46 @@ function hundredGramUnitInfo() {
 
 function parsePrice(value) {
     return Number.parseInt(String(value ?? "").replace(/[^\d]/g, ""), 10) || 0;
+}
+
+function parseQuantity(value) {
+    const raw = cleanText(value);
+    if (!raw) return null;
+
+    const normalized = raw.replace(/\s/g, "").replace(",", ".");
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) return null;
+    return roundQty(Math.max(0, parsed));
+}
+
+function getAvailableCartQuantity(product) {
+    if (!Number.isFinite(product?.quantity)) return null;
+
+    const available = product.priceUnit === UNIT_100_GRAM
+        ? product.quantity * 1000
+        : product.quantity;
+    const step = Number(product.quantityStep) || 1;
+    return roundQty(Math.floor((available + 0.000001) / step) * step);
+}
+
+function hasStockForSale(product) {
+    const available = getAvailableCartQuantity(product);
+    return available === null || available > 0;
+}
+
+function clampCartQuantity(product, value) {
+    const positive = roundQty(Math.max(0, Number(value) || 0));
+    const available = getAvailableCartQuantity(product);
+    if (available === null) return positive;
+
+    const step = Number(product.quantityStep) || 1;
+    const capped = Math.min(positive, available);
+    return roundQty(Math.floor((capped + 0.000001) / step) * step);
+}
+
+function isCartAtStockLimit(product, quantity) {
+    const available = getAvailableCartQuantity(product);
+    return available !== null && Number(quantity || 0) + 0.000001 >= available;
 }
 
 function parseAvailabilityValue(value) {
@@ -581,6 +625,7 @@ function renderProducts() {
 
 function renderProductCard(product) {
     const qty = cart[product.id] || 0;
+    const cartAtStockLimit = isCartAtStockLimit(product, qty);
     const unitLabel = (product.isWeighted ?? product.unit === UNIT_KG) ? "весовой" : "штучный";
     const priceUnit = product.priceUnit || product.unit;
     const priceMissing = product.price >= 100000;
@@ -608,7 +653,7 @@ function renderProductCard(product) {
                     <span class="counter-val">${formatQty(qty)}</span>
                     <span class="counter-unit">${escapeHtml(product.unit)}</span>
                 </div>
-                <button class="counter-btn plus" type="button" data-id="${product.id}" data-action="plus" aria-label="Добавить ${escapeHtml(product.name)}">+</button>
+                <button class="counter-btn plus" type="button" data-id="${product.id}" data-action="plus" aria-label="Добавить ${escapeHtml(product.name)}"${cartAtStockLimit ? " disabled aria-disabled=\"true\" title=\"Доступное количество уже в корзине\"" : ""}>+</button>
             </div>
         </article>
     `;
@@ -620,7 +665,7 @@ function changeCartItemQuantity(id, action) {
 
     const current = Number(cart[id] || 0);
     const next = action === "plus" ? current + product.quantityStep : current - product.quantityStep;
-    const rounded = roundQty(Math.max(0, next));
+    const rounded = clampCartQuantity(product, next);
 
     if (rounded > 0) {
         cart[id] = rounded;
@@ -656,6 +701,22 @@ function getCartItems() {
         .filter(Boolean);
 }
 
+function reconcileCartWithProducts() {
+    const nextCart = Object.entries(cart).reduce((next, [id, qty]) => {
+        const product = productsById.get(String(id));
+        if (!product) return next;
+
+        const clamped = clampCartQuantity(product, qty);
+        if (clamped > 0) next[id] = clamped;
+        return next;
+    }, {});
+
+    if (JSON.stringify(nextCart) === JSON.stringify(cart)) return;
+    cart = nextCart;
+    saveCartToStorage();
+    updateCartBadge();
+}
+
 function renderCart() {
     const items = getCartItems();
     const cartTotal = getCartTotal(items);
@@ -677,7 +738,7 @@ function renderCart() {
                     <span class="counter-val">${formatQty(item.qty)}</span>
                     <span class="counter-unit">${escapeHtml(item.unit)}</span>
                 </div>
-                <button class="counter-btn plus cart-counter-btn" type="button" data-id="${item.id}" data-action="plus" aria-label="Добавить ${escapeHtml(item.name)}">+</button>
+                <button class="counter-btn plus cart-counter-btn" type="button" data-id="${item.id}" data-action="plus" aria-label="Добавить ${escapeHtml(item.name)}"${isCartAtStockLimit(item, item.qty) ? " disabled aria-disabled=\"true\" title=\"Доступное количество уже в корзине\"" : ""}>+</button>
             </div>
         </div>
     `).join("");

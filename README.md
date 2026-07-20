@@ -23,7 +23,7 @@ https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5w
 Ожидаемые колонки:
 
 ```text
-id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quantity,sale,image,comment
+id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quantity,sale,image,comment,quantity_1c,reserve,min_qty,manual_quantity
 ```
 
 Правила:
@@ -35,9 +35,11 @@ id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quant
 - `category1`: категория внутри `category0`, показывается вторым рядом.
 - `availability`: сайт показывает только `in stock`.
 - `price`: сайт показывает только товары с ценой больше нуля.
-- `quantity`: остаток; сейчас может быть пустым, когда поставщик его не дает.
+- `quantity`: автоматически рассчитанный ботом доступный остаток для сайта. Числовое значение ограничивает количество, которое покупатель может добавить в корзину; `0` скрывает товар из каталога.
+- `manual_quantity`: необязательный ручной остаток. Корректное число имеет приоритет над `quantity`: `0` скрывает товар, положительное число ограничивает заказ этим значением. Пустая ячейка включает автоматическую логику 1С (`quantity_1c` → `reserve` → `min_qty`).
 - `sale`: пока всем `no`.
 - `image`: необязательная ссылка на фото товара.
 - `comment`: ручной комментарий, на сайт не выводится как служебная диагностика.
+
 
 Сайт игнорирует строки без `barcode`, с `publish=no`, с `availability=out of stock` и без валидной цены.

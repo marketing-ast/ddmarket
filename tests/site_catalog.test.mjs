@@ -104,6 +104,58 @@ test("normalizes only published products with barcode, price, and stock", () => 
     assert.equal(products[0].emoji, undefined);
 });
 
+test("uses known quantity to hide zero stock and cap a piece item in the cart", () => {
+    const { context } = loadApp();
+
+    const products = context.normalizeProducts([
+        { id: "010001", publish: "yes", barcode: "2000000177625", name: "In stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "2" },
+        { id: "010002", publish: "yes", barcode: "2000000177626", name: "Zero stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "0" },
+        { id: "010003", publish: "yes", barcode: "2000000177627", name: "Unknown stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "" },
+    ]);
+
+    assert.deepEqual(products.map((product) => product.id), ["010001", "010003"]);
+    assert.equal(products[0].quantity, 2);
+    assert.equal(products[1].quantity, null);
+
+    context.setProducts(products);
+    context.changeCartItemQuantity("010001", "plus");
+    context.changeCartItemQuantity("010001", "plus");
+    context.changeCartItemQuantity("010001", "plus");
+
+    const [item] = context.getCartItems();
+    assert.equal(item.qty, 2);
+    assert.match(context.renderProductCard(item), /disabled aria-disabled="true"/);
+});
+
+test("uses manual_quantity before the automatic 1C quantity", () => {
+    const { context } = loadApp();
+
+    const products = context.normalizeProducts([
+        { id: "010001", publish: "yes", barcode: "2000000177625", name: "Manual stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "2", manual_quantity: "7" },
+        { id: "010002", publish: "yes", barcode: "2000000177626", name: "Manual zero", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "8", manual_quantity: "0" },
+        { id: "010003", publish: "yes", barcode: "2000000177627", name: "Automatic stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", quantity: "3", manual_quantity: "" },
+    ]);
+
+    assert.deepEqual(products.map((product) => product.id), ["010001", "010003"]);
+    assert.equal(products[0].quantity, 7);
+    assert.equal(products[1].quantity, 3);
+});
+
+test("converts kilogram quantity to 100 gram cart portions", () => {
+    const { context } = loadApp();
+
+    context.setProducts([
+        { id: "040009", publish: "yes", barcode: "2000000177621", name: "Parsley", unit: "0,1", category0: "Catalog", category1: "Greens", availability: "in stock", price: "312", quantity: "0,3" },
+    ]);
+    for (let index = 0; index < 4; index += 1) {
+        context.changeCartItemQuantity("040009", "plus");
+    }
+
+    const [item] = context.getCartItems();
+    assert.equal(item.qty, 300);
+    assert.equal(context.getAvailableCartQuantity(item), 300);
+});
+
 test("renders product photos as lightbox buttons", () => {
     const { context } = loadApp();
 
