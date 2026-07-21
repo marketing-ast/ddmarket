@@ -23,7 +23,7 @@ https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5w
 Ожидаемые колонки:
 
 ```text
-id,publish,barcode,name,name1s,unit,category0,category1,availability,price,ostatok,sale,image,comment,ostatok_1c,reserve,min_qty,ruchnoi_ostatok
+id,publish,barcode,name,name1s,unit,category0,category1,price,ostatok,sale,image,comment,ostatok_1c,reserve,min_qty,ruchnoi_ostatok
 ```
 
 Правила:
@@ -41,4 +41,4 @@ id,publish,barcode,name,name1s,unit,category0,category1,availability,price,ostat
 - `comment`: ручной комментарий, на сайт не выводится как служебная диагностика.
 
 
-Сайт игнорирует строки без `barcode`, с `publish=no`, без валидной цены и с остатком `0`. Колонка `availability` временно сохранена для безопасного перехода, но сайт и бот её больше не используют.
+Сайт игнорирует строки без `barcode`, с `publish=no`, без валидной цены и с остатком `0`.
