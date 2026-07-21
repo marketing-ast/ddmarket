@@ -138,7 +138,9 @@ function normalizeProducts(rawProducts) {
             const barcode = cleanText(item.barcode);
             const category1 = cleanText(item.category1) || cleanText(item.category) || FALLBACK_CATEGORY1;
             const category0 = cleanText(item.category0) || getCategory0FromLegacyCategory(category1);
-            const manualQuantity = parseManualQuantity(item.manual_quantity, unitInfo);
+            // Canonical Sheet fields are Russian. The legacy fallbacks keep the bundled
+            // CSV usable while the public Google Sheet switches to the new schema.
+            const manualQuantity = parseManualQuantity(item.ruchnoi_ostatok ?? item.manual_quantity, unitInfo);
             return {
                 id,
                 publish: parsePublishValue(item.publish),
@@ -148,9 +150,8 @@ function normalizeProducts(rawProducts) {
                 unit: unitInfo.unit,
                 category0,
                 category1,
-                availability: item.availability,
                 price: parsePrice(item.price),
-                quantity: manualQuantity ?? parseQuantity(item.quantity),
+                quantity: manualQuantity ?? parseQuantity(item.ostatok ?? item.quantity),
                 sale: parseSaleValue(item.sale),
                 image: normalizeImageUrl(item.image),
                 quantityStep: unitInfo.quantityStep,
@@ -164,7 +165,6 @@ function normalizeProducts(rawProducts) {
             && item.barcode
             && item.name
             && item.price > 0
-            && parseAvailabilityValue(item.availability)
             && hasStockForSale(item)
         ));
 }
@@ -302,12 +302,6 @@ function clampCartQuantity(product, value) {
 function isCartAtStockLimit(product, quantity) {
     const available = getAvailableCartQuantity(product);
     return available !== null && Number(quantity || 0) + 0.000001 >= available;
-}
-
-function parseAvailabilityValue(value) {
-    const normalized = cleanText(value).toLowerCase();
-    if (!normalized) return true;
-    return !["out of stock", "unavailable", "нет", "no", "false", "0"].some((marker) => normalized.includes(marker));
 }
 
 function parsePublishValue(value) {

@@ -95,13 +95,14 @@ test("normalizes only published products with barcode, price, and stock", () => 
         { id: "010005", publish: "yes", barcode: "2000000000005", name: "No price", unit: "шт", category0: "БАКАЛЕЯ", category1: "СНЕКИ", availability: "in stock", price: "" },
     ]);
 
-    assert.equal(products.length, 1);
+    assert.equal(products.length, 2);
     assert.equal(products[0].id, "010001");
     assert.equal(products[0].barcode, "2000000177625");
     assert.equal(products[0].category0, "ОВОЩИ/ФРУКТЫ");
     assert.equal(products[0].category1, "ОВОЩИ");
     assert.equal(products[0].category, undefined);
     assert.equal(products[0].emoji, undefined);
+    assert.equal(products[1].id, "010004");
 });
 
 test("uses known quantity to hide zero stock and cap a piece item in the cart", () => {
@@ -141,6 +142,20 @@ test("uses manual_quantity before the automatic 1C quantity", () => {
     assert.equal(products[0].quantity, 7);
     assert.equal(products[1].quantity, 3);
     assert.equal(products[2].quantity, 4);
+});
+
+test("uses ruchnoi_ostatok before ostatok and ignores availability", () => {
+    const { context } = loadApp();
+
+    const products = context.normalizeProducts([
+        { id: "010001", publish: "yes", barcode: "2000000177625", name: "Manual stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "out of stock", price: "100", ostatok: "2", ruchnoi_ostatok: "7" },
+        { id: "010002", publish: "yes", barcode: "2000000177626", name: "Manual zero", unit: "шт", category0: "Catalog", category1: "Category", availability: "in stock", price: "100", ostatok: "8", ruchnoi_ostatok: "0" },
+        { id: "010003", publish: "yes", barcode: "2000000177627", name: "Automatic stock", unit: "шт", category0: "Catalog", category1: "Category", availability: "out of stock", price: "100", ostatok: "3", ruchnoi_ostatok: "" },
+    ]);
+
+    assert.deepEqual(products.map((product) => product.id), ["010001", "010003"]);
+    assert.equal(products[0].quantity, 7);
+    assert.equal(products[1].quantity, 3);
 });
 
 test("converts kilogram quantity to 100 gram cart portions", () => {

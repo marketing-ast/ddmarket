@@ -23,7 +23,7 @@ https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5w
 Ожидаемые колонки:
 
 ```text
-id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quantity,sale,image,comment,quantity_1c,reserve,min_qty,manual_quantity
+id,publish,barcode,name,name1s,unit,category0,category1,availability,price,ostatok,sale,image,comment,ostatok_1c,reserve,min_qty,ruchnoi_ostatok
 ```
 
 Правила:
@@ -33,13 +33,12 @@ id,publish,barcode,name,name1s,unit,category0,category1,availability,price,quant
 - `unit`: `кг` для весовых товаров, `шт` для упаковок и штучных товаров.
 - `category0`: верхняя категория для первого ряда навигации на сайте.
 - `category1`: категория внутри `category0`, показывается вторым рядом.
-- `availability`: сайт показывает только `in stock`.
 - `price`: сайт показывает только товары с ценой больше нуля.
-- `quantity`: постоянная формула автоматического остатка для сайта. Она считает запас из `quantity_1c`, `reserve`, `min_qty` и `unit`; пустой `reserve` означает `0%`, а пустой `quantity_1c` даёт `0`. Числовое значение ограничивает количество, которое покупатель может добавить в корзину; `0` скрывает товар из каталога.
-- `manual_quantity`: необязательный ручной остаток. Корректное число имеет приоритет над `quantity`: `0` скрывает товар, положительное число ограничивает заказ этим значением. Бот всё равно рассчитывает и обновляет автоматический остаток в `quantity`; после очистки `manual_quantity` сайт сразу переключается на актуальную логику 1С (`quantity_1c` → `reserve` → `min_qty`).
+- `ostatok`: постоянная формула автоматического остатка для сайта. Она считает запас из `ostatok_1c`, `reserve`, `min_qty` и `unit`; пустой `reserve` означает `0%`, а пустой `ostatok_1c` даёт `0`. Числовое значение ограничивает количество, которое покупатель может добавить в корзину; `0` скрывает товар из каталога.
+- `ruchnoi_ostatok`: необязательный ручной остаток. Корректное число имеет приоритет над `ostatok`: `0` скрывает товар, положительное число ограничивает заказ этим значением. Бот всё равно рассчитывает и обновляет автоматический остаток в `ostatok`; после очистки `ruchnoi_ostatok` сайт сразу переключается на актуальную логику 1С (`ostatok_1c` → `reserve` → `min_qty`).
 - `sale`: пока всем `no`.
 - `image`: необязательная ссылка на фото товара.
 - `comment`: ручной комментарий, на сайт не выводится как служебная диагностика.
 
 
-Сайт игнорирует строки без `barcode`, с `publish=no`, с `availability=out of stock` и без валидной цены.
+Сайт игнорирует строки без `barcode`, с `publish=no`, без валидной цены и с остатком `0`. Колонка `availability` временно сохранена для безопасного перехода, но сайт и бот её больше не используют.
