@@ -6,8 +6,10 @@ const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const FALLBACK_WHATSAPP_PHONE = "77785252162";
 const DEFAULT_MIN_ORDER_AMOUNT = 12000;
 const DEFAULT_FREE_DELIVERY_AMOUNT = 30000;
-const CACHE_KEY = "ddmarket_products_v7";
-const CACHE_TIME_KEY = "ddmarket_products_ts_v7";
+// Bump together with an inventory-schema change so browsers never reuse a
+// catalogue parsed by an older client that did not understand manual stock.
+const CACHE_KEY = "ddmarket_products_v8";
+const CACHE_TIME_KEY = "ddmarket_products_ts_v8";
 const CART_KEY = "ddmarket_cart_v3";
 const ACTIVE_SCREEN_KEY = "ddmarket_active_screen";
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;

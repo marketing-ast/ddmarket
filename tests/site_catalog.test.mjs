@@ -471,9 +471,9 @@ test("treats 0,1 unit as 100 gram portions", () => {
     assert.match(context.buildOrderText(items), /Parsley - 500/);
 });
 
-test("ignores stale v6 catalog cache when loading 100 gram units", async () => {
+test("ignores stale v7 catalog cache when loading 100 gram units", async () => {
     const { context, localStorageData } = loadApp();
-    localStorageData.set("ddmarket_products_v6", JSON.stringify([
+    localStorageData.set("ddmarket_products_v7", JSON.stringify([
         {
             id: "040009",
             publish: true,
@@ -487,7 +487,7 @@ test("ignores stale v6 catalog cache when loading 100 gram units", async () => {
             quantityStep: 0.1,
         },
     ]));
-    localStorageData.set("ddmarket_products_ts_v6", String(Date.now()));
+    localStorageData.set("ddmarket_products_ts_v7", String(Date.now()));
     context.fetch = async () => ({
         ok: true,
         text: async () => [
@@ -498,7 +498,7 @@ test("ignores stale v6 catalog cache when loading 100 gram units", async () => {
 
     await context.fetchProductsFromSheets();
     const product = context.getCartItems().length;
-    const [freshProduct] = context.normalizeProducts(JSON.parse(localStorageData.get("ddmarket_products_v7")));
+    const [freshProduct] = context.normalizeProducts(JSON.parse(localStorageData.get("ddmarket_products_v8")));
 
     assert.equal(product, 0);
     assert.equal(freshProduct.unit, "грамм");
