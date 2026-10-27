@@ -8,6 +8,7 @@ DD Market - статический каталог продуктов с корз
 - `style.css` - mobile-first дизайн DD Market по брендбуку.
 - `app.js` - загрузка CSV из Google Sheets, фильтры, корзина, кеш и WhatsApp.
 - `data/ddmarket-products.csv` - резервная выгрузка текущего каталога.
+- `scripts/category_sync.py` - автоматические категории, выпадающие списки и постоянные ID через существующий сервисный аккаунт.
 - `scripts/convert-client-catalog.js` - конвертер клиентского Excel в формат каталога.
 - `assets/fonts/` - локально подключенный фирменный шрифт Onest.
 - `logo/` - логотип DD Market для интерфейса.
@@ -42,3 +43,10 @@ id,publish,barcode,name,name1s,unit,category0,category1,price,ostatok,sale,image
 
 
 Сайт игнорирует строки без `barcode`, с `publish=no`, без валидной цены и с остатком `0`.
+
+## Добавление категорий
+
+Добавьте категорию и подкатегорию в `categories!A:B`. Серверный сервис заполнит
+технические поля и обновит списки обычно за 15–30 секунд. Новому заполненному товару
+с пустым ID присваивается постоянный номер; существующие ID сохраняются.
+Порядок меню берётся из `sort0`/`sort1`. Подробности и откат: [docs/category-automation.md](docs/category-automation.md).

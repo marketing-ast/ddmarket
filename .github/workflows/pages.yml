@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Test catalog and category automation
+        run: |
+          node --test tests/site_catalog.test.mjs
+          python3 -B -m unittest discover -s tests -p test_category_sync.py
+
       - name: Configure Pages
         uses: actions/configure-pages@v6
         with:

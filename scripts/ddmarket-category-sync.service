@@ -1,0 +1,18 @@
+[Unit]
+Description=DD Market category and permanent ID synchronization
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ddmarket-import-bot
+EnvironmentFile=/opt/ddmarket-import-bot/.env
+ExecStart=/opt/ddmarket-import-bot/.venv/bin/python /opt/ddmarket-import-bot/scripts/category_sync.py --interval 15 --spreadsheet-id 1IcNPMvcEHIkpIIX9V1Ll7iax3zwVfnORNph83-haaWM
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

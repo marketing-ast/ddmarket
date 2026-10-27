@@ -72,6 +72,96 @@ function loadApp() {
     return { context, elements, localStorageData };
 }
 
+const catalogCsv = (category0 = "ЗООТОВАРЫ", category1 = "КОРМ") => [
+    "id,publish,barcode,name,unit,category0,category1,price,ostatok",
+    `490001,yes,2000000000001,Корм,шт,${category0},${category1},100,5`,
+].join("\n");
+const response = (csv) => ({ ok: true, text: async () => csv });
+
+test("cache hit releases refresh lock and later expiry fetches new categories", async () => {
+    const { context, localStorageData } = loadApp();
+    localStorageData.set("ddmarket_products_v8", JSON.stringify(context.parseCSV(catalogCsv())));
+    localStorageData.set("ddmarket_products_ts_v8", String(Date.now()));
+    let requests = 0;
+    context.fetch = async () => { requests++; return response(catalogCsv("НОВОЕ", "НОВАЯ")); };
+    assert.equal(await context.fetchProductsFromSheets(), true);
+    assert.equal(requests, 0);
+    localStorageData.set("ddmarket_products_ts_v8", String(Date.now() - 600000));
+    assert.equal(await context.fetchProductsFromSheets(), true);
+    assert.equal(requests, 1);
+    assert.deepEqual([...context.getSuperCategories()], ["НОВОЕ"]);
+});
+
+test("invalid response preserves working catalog, cart and last good cache", async () => {
+    const { context, localStorageData } = loadApp();
+    context.fetch = async () => response(catalogCsv());
+    await context.fetchProductsFromSheets();
+    context.changeCartItemQuantity("490001", "plus");
+    const cached = localStorageData.get("ddmarket_products_v8");
+    localStorageData.set("ddmarket_products_ts_v8", String(Date.now() - 600000));
+    context.fetch = async () => response("category0,category1\nЗООТОВАРЫ,КОРМ");
+    assert.equal(await context.fetchProductsFromSheets(), false);
+    assert.equal(context.getCartItems()[0].id, "490001");
+    assert.equal(context.getCartItems()[0].qty, 1);
+    assert.equal(localStorageData.get("ddmarket_products_v8"), cached);
+});
+
+test("expired valid cache is preferred to old bundled products during an outage", async () => {
+    const { context, localStorageData } = loadApp();
+    localStorageData.set("ddmarket_products_v8", JSON.stringify(context.parseCSV(catalogCsv())));
+    localStorageData.set("ddmarket_products_ts_v8", String(Date.now() - 600000));
+    let requests = 0;
+    context.fetch = async () => { requests++; throw new Error("offline"); };
+    assert.equal(await context.fetchProductsFromSheets(), true);
+    assert.equal(requests, 1);
+    assert.deepEqual([...context.getSuperCategories()], ["ЗООТОВАРЫ"]);
+});
+
+test("catalog rejects missing IDs, duplicate IDs and formula errors", () => {
+    const { context } = loadApp();
+    const rows = context.parseCSV(catalogCsv());
+    assert.throws(() => context.validateCatalogRows([...rows, ...rows]), /duplicate/);
+    assert.throws(() => context.validateCatalogRows([{ ...rows[0], id: "" }]), /Missing/);
+    assert.throws(() => context.validateCatalogRows([{ ...rows[0], ostatok: "#REF!" }]), /formula/);
+    // Zero-stock products are a legitimate catalog, not a network failure.
+    assert.equal(context.validateCatalogRows([{ ...rows[0], ostatok: "0" }]).length, 1);
+});
+
+test("category directory controls both orders, scoped to the parent, without hiding extras", async () => {
+    const { context } = loadApp();
+    const base = context.parseCSV(catalogCsv())[0];
+    context.setProducts([
+        {...base, id:"1", category0:"ЗООТОВАРЫ", category1:"ПРОЧЕЕ"},
+        {...base, id:"2", category0:"ЗООТОВАРЫ", category1:"КОРМ"},
+        {...base, id:"3", category0:"БАКАЛЕЯ", category1:"ПРОЧЕЕ"},
+        {...base, id:"4", category0:"БАКАЛЕЯ", category1:"СОУСЫ"},
+        {...base, id:"5", category0:"ЕЩЁ НОВОЕ", category1:"НОВОЕ"},
+    ]);
+    context.fetch = async () => response([
+        "category0,category1,sort0,sort1",
+        "ЗООТОВАРЫ,ПРОЧЕЕ,1,2", "ЗООТОВАРЫ,КОРМ,1,1",
+        "БАКАЛЕЯ,ПРОЧЕЕ,2,1", "БАКАЛЕЯ,СОУСЫ,2,2",
+        "ПУСТАЯ,ПУСТАЯ,3,1",
+    ].join("\n"));
+    assert.equal(await context.fetchCategoriesFromSheets(), true);
+    assert.deepEqual([...context.getSuperCategories()], ["ЗООТОВАРЫ","БАКАЛЕЯ","ЕЩЁ НОВОЕ"]);
+    assert.deepEqual([...context.getCategoriesForSuperCategory("ЗООТОВАРЫ")], ["КОРМ","ПРОЧЕЕ"]);
+    assert.deepEqual([...context.getCategoriesForSuperCategory("БАКАЛЕЯ")], ["ПРОЧЕЕ","СОУСЫ"]);
+    context.fetch = async () => response("oops\nbroken");
+    assert.equal(await context.fetchCategoriesFromSheets(), false);
+    assert.deepEqual([...context.getCategoriesForSuperCategory("ЗООТОВАРЫ")], ["КОРМ","ПРОЧЕЕ"]);
+});
+
+test("cart survives category and subcategory changes when product ID stays constant", () => {
+    const { context } = loadApp();
+    context.setProducts(context.parseCSV(catalogCsv()));
+    context.changeCartItemQuantity("490001", "plus");
+    context.setProducts(context.parseCSV(catalogCsv("НОВОЕ", "НОВАЯ")));
+    assert.equal(context.getCartItems()[0].id, "490001");
+    assert.equal(context.getCartItems()[0].qty, 1);
+    assert.equal(context.getCartItems()[0].category0, "НОВОЕ");
+});
+
 test("normalizes only published products with barcode, price, and stock", () => {
     const { context } = loadApp();
 

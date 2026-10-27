@@ -1,6 +1,8 @@
 "use strict";
 
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?output=csv";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=0&single=true&output=csv";
+const CATEGORIES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1001&single=true&output=csv";
+const CATEGORIES_CACHE_KEY = "ddmarket_categories_v1";
 const SITE_PROMOS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQy0tUi3LVSJ_o7DMI_2OAFxr-651J5wgDJBnL0cNq18YNAltbsgEPwYO0QDp4p00mOrwhY1i3IrT_m/pub?gid=1004&single=true&output=csv&range=A1:C20";
 const FALLBACK_CSV_URL = "data/ddmarket-products.csv";
 const FALLBACK_WHATSAPP_PHONE = "77785252162";
@@ -88,6 +90,8 @@ const priceFormatter = new Intl.NumberFormat("ru-KZ", {
 });
 
 let products = [];
+let categoryDefinitions = [];
+let catalogLoaded = false;
 let productsById = new Map(products.map((item) => [item.id, item]));
 let cart = {};
 let activeSuperCategory = null;
@@ -450,43 +454,58 @@ async function loadPromosFromUrl(url) {
 async function fetchProductsFromSheets() {
     if (refreshInProgress) return false;
     refreshInProgress = true;
-
+    let cachedProducts = null;
+    let cachedTime = 0;
     try {
-        const cachedTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached && cachedTime && Date.now() - cachedTime < REFRESH_INTERVAL_MS) {
-            setProducts(JSON.parse(cached));
+        try {
+            cachedTime = Number(localStorage.getItem(CACHE_TIME_KEY) || 0);
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) cachedProducts = validateCatalogRows(JSON.parse(cached));
+        } catch {
+            cachedProducts = null;
+        }
+        if (cachedProducts && cachedTime && Date.now() - cachedTime < REFRESH_INTERVAL_MS) {
+            setProducts(cachedProducts);
+            catalogLoaded = true;
             updateLastUpdateDisplay(cachedTime);
             return true;
         }
-    } catch {
-        // Continue with live fetch when localStorage is unavailable.
-    }
-
-    try {
-        const parsedProducts = await loadCatalogFromUrl(SHEET_CSV_URL);
-        setProducts(parsedProducts);
-        const now = Date.now();
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(parsedProducts));
-            localStorage.setItem(CACHE_TIME_KEY, String(now));
-        } catch {
-            // Cache is optional.
-        }
-        updateLastUpdateDisplay(now);
-        return true;
-    } catch (error) {
-        console.warn("[DD Market] Google Sheet is unavailable.", error);
-        try {
+            const parsedProducts = await loadCatalogFromUrl(SHEET_CSV_URL);
+            setProducts(parsedProducts);
+            catalogLoaded = true;
+            const now = Date.now();
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(parsedProducts));
+                localStorage.setItem(CACHE_TIME_KEY, String(now));
+            } catch {
+                // Cache is optional.
+            }
+            updateLastUpdateDisplay(now);
+            return true;
+        } catch (error) {
+            console.warn("[DD Market] Google Sheet is unavailable or invalid.", error);
+            // Never replace a working catalogue with the bundled, older export.
+            if (catalogLoaded) {
+                updateLastUpdateDisplay(null);
+                return false;
+            }
+            if (cachedProducts) {
+                setProducts(cachedProducts);
+                catalogLoaded = true;
+                updateLastUpdateDisplay(null);
+                return true;
+            }
             const fallbackProducts = await loadCatalogFromUrl(FALLBACK_CSV_URL);
             setProducts(fallbackProducts);
-            updateLastUpdateDisplay(Date.now());
-            return true;
-        } catch (fallbackError) {
-            console.warn("[DD Market] Fallback catalog is unavailable.", fallbackError);
+            catalogLoaded = true;
             updateLastUpdateDisplay(null);
-            return false;
+            return true;
         }
+    } catch (error) {
+        console.warn("[DD Market] No valid catalog available.", error);
+        updateLastUpdateDisplay(null);
+        return false;
     } finally {
         refreshInProgress = false;
     }
@@ -499,8 +518,76 @@ async function loadCatalogFromUrl(url) {
 
     const csvText = await response.text();
     const parsed = parseCSV(csvText);
-    if (parsed.length === 0) throw new Error("Empty catalog");
-    return parsed;
+    return validateCatalogRows(parsed);
+}
+
+function validateCatalogRows(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error("Empty catalog");
+    const headers = rows[0];
+    if (!headers || !["id", "barcode", "name", "price"].every((key) => Object.hasOwn(headers, key))
+        || !(Object.hasOwn(headers, "category") || (Object.hasOwn(headers, "category0") && Object.hasOwn(headers, "category1")))) {
+        throw new Error("Invalid catalog columns");
+    }
+    const ids = new Set();
+    const populated = rows.filter((row) => row && Object.values(row).some((value) => cleanText(value)));
+    for (const row of populated) {
+        const id = cleanText(row.id).replace(/^'/, "");
+        // Blank template rows may contain formulas/defaults, but never a product.
+        if (!id && !cleanText(row.name) && !cleanText(row.barcode)) continue;
+        if (!id || ids.has(id)) throw new Error("Missing or duplicate product ID");
+        ids.add(id);
+        if (Object.values(row).some((value) => /^#(?:REF!|ERROR!|VALUE!|N\/A|NAME\?|NUM!|DIV\/0!)/.test(cleanText(value)))) {
+            throw new Error("Spreadsheet formula error");
+        }
+    }
+    if (!ids.size) throw new Error("Catalog has no product IDs");
+    return populated;
+}
+
+function normalizeCategoryDefinitions(rows) {
+    if (!Array.isArray(rows) || !rows.length || !["category0", "category1", "sort0", "sort1"].every((key) => Object.hasOwn(rows[0], key))) {
+        throw new Error("Invalid categories columns");
+    }
+    const seen = new Set();
+    const parentOrder = new Map();
+    const definitions = [];
+    for (const row of rows) {
+        const category0 = cleanText(row.category0);
+        const category1 = cleanText(row.category1);
+        if (!category0 || !category1 || !cleanText(row.sort0) || !cleanText(row.sort1)) continue;
+        const sort0 = Number(row.sort0);
+        const sort1 = Number(row.sort1);
+        const key = JSON.stringify([category0, category1]);
+        if (category0 === SALE_VIEW_ID || seen.has(key) || !Number.isSafeInteger(sort0) || sort0 < 1
+            || !Number.isSafeInteger(sort1) || sort1 < 1 || (parentOrder.has(category0) && parentOrder.get(category0) !== sort0)) {
+            throw new Error("Invalid category definition");
+        }
+        seen.add(key);
+        parentOrder.set(category0, sort0);
+        definitions.push({ category0, category1, sort0, sort1 });
+    }
+    if (!definitions.length) throw new Error("Empty categories");
+    return definitions;
+}
+
+async function fetchCategoriesFromSheets() {
+    if (!categoryDefinitions.length) {
+        try {
+            const cached = localStorage.getItem(CATEGORIES_CACHE_KEY);
+            if (cached) categoryDefinitions = normalizeCategoryDefinitions(JSON.parse(cached));
+        } catch { /* Use the product-derived menu if no valid directory exists. */ }
+    }
+    try {
+        const response = await fetch(`${CATEGORIES_CSV_URL}&t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const definitions = normalizeCategoryDefinitions(parseCSV(await response.text()));
+        categoryDefinitions = definitions;
+        try { localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(definitions)); } catch { /* Optional cache. */ }
+        return true;
+    } catch (error) {
+        console.warn("[DD Market] Keeping previous category order.", error);
+        return false;
+    }
 }
 
 function updateLastUpdateDisplay(timestamp) {
@@ -526,6 +613,10 @@ function getCategory0FromLegacyCategory(category1) {
 
 function getSuperCategories() {
     const available = new Set(products.map((item) => item.category0));
+    if (categoryDefinitions.length) {
+        const order = new Map(categoryDefinitions.map((row) => [row.category0, row.sort0]));
+        return [...available].sort((a, b) => (order.get(a) ?? Number.MAX_SAFE_INTEGER) - (order.get(b) ?? Number.MAX_SAFE_INTEGER) || a.localeCompare(b, "ru"));
+    }
     const ordered = CATEGORY0_ORDER.filter((category0) => available.has(category0));
     const extra = [...available]
         .filter((category0) => !CATEGORY0_ORDER.includes(category0))
@@ -533,7 +624,10 @@ function getSuperCategories() {
     return [...ordered, ...extra];
 }
 
-function getCategory1SortIndex(category1) {
+function getCategory1SortIndex(category1, category0) {
+    if (categoryDefinitions.length) {
+        return categoryDefinitions.find((row) => row.category0 === category0 && row.category1 === category1)?.sort1 ?? Number.MAX_SAFE_INTEGER;
+    }
     const index = CATEGORY1_ORDER.indexOf(category1);
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
@@ -544,7 +638,7 @@ function getCategoriesForSuperCategory(category0) {
             .filter((item) => item.category0 === category0)
             .map((item) => item.category1)
     )].sort((a, b) => {
-        const byOrder = getCategory1SortIndex(a) - getCategory1SortIndex(b);
+        const byOrder = getCategory1SortIndex(a, category0) - getCategory1SortIndex(b, category0);
         return byOrder || a.localeCompare(b, "ru");
     });
 }
@@ -983,7 +1077,7 @@ async function init() {
     updateCartBadge();
     renderCategories();
     renderProducts();
-    await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets()]);
+    await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets(), fetchCategoriesFromSheets()]);
     renderCategories();
     renderProducts();
 
@@ -992,8 +1086,8 @@ async function init() {
 
     setInterval(async () => {
         if (document.hidden) return;
-        const [updated] = await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets()]);
-        if (updated) {
+        const [updated, , categoriesUpdated] = await Promise.all([fetchProductsFromSheets(), fetchPromosFromSheets(), fetchCategoriesFromSheets()]);
+        if (updated || categoriesUpdated) {
             renderCategories();
             renderProducts();
             if ($("#cart-screen").classList.contains("active")) renderCart();
