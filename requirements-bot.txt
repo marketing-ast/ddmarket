@@ -1,0 +1,6 @@
+# Versions already used by the production bot on 2026-10-28.
+requests==2.34.2
+python-dotenv==1.2.2
+openpyxl==3.1.5
+google-auth==2.53.0
+google-api-python-client==2.197.0

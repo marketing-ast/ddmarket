@@ -50,3 +50,9 @@ id,publish,barcode,name,name1s,unit,category0,category1,price,ostatok,sale,image
 технические поля и обновит списки обычно за 15–30 секунд. Новому заполненному товару
 с пустым ID присваивается постоянный номер; существующие ID сохраняются.
 Порядок меню берётся из `sort0`/`sort1`. Подробности и откат: [docs/category-automation.md](docs/category-automation.md).
+
+## Telegram-бот
+
+У сотрудников независимые сеансы в общей группе; подтверждения привязаны к владельцу
+и текущему шагу. Защита от повторов, конфликтов записи и порядок установки описаны в
+[docs/telegram-bot.md](docs/telegram-bot.md).

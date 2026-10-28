@@ -28,7 +28,9 @@ jobs:
       - name: Test catalog and category automation
         run: |
           node --test tests/site_catalog.test.mjs
-          python3 -B -m unittest discover -s tests -p test_category_sync.py
+          python3 -m venv "$RUNNER_TEMP/ddmarket-bot-tests"
+          "$RUNNER_TEMP/ddmarket-bot-tests/bin/pip" install -r requirements-bot.txt
+          "$RUNNER_TEMP/ddmarket-bot-tests/bin/python" -B -m unittest discover -s tests -p 'test_*.py'
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
